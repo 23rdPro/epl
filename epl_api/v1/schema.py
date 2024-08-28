@@ -37,8 +37,12 @@ class DefenceSchema(BaseModel):
     clearances: int 
     headed_clearance: int 
     
-     
-class PlayerStatsSchema(BaseModel):
+    
+class ClubSchema(BaseModel):
+    name: str 
+    
+class PlayerStatsSchema(ClubSchema):
+    player_name: str 
     appearances: int 
     goals: int
     wins: int
@@ -48,3 +52,27 @@ class PlayerStatsSchema(BaseModel):
     discipline: DisciplineSchema
     defence: DefenceSchema
     
+class FixtureSchema(BaseModel):
+    home: ClubSchema 
+    away: ClubSchema 
+    time: str 
+    
+    
+class TableSchema(BaseModel):
+    position: int 
+    club: ClubSchema
+    played: int
+    won: int 
+    drawn: int 
+    lost: int 
+    gf: int 
+    ga: int 
+    gd: int 
+    points: int 
+    form: str  
+    
+    
+class ResultSchema(BaseModel):
+    home: ClubSchema 
+    away: ClubSchema
+    score: str 
