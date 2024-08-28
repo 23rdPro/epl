@@ -5,3 +5,5 @@ db.sqlite3
 epl_api/__pycache__/settings.cpython-39.pyc
 epl_api/__pycache__/urls.cpython-39.pyc
 epl_api/__pycache__/wsgi.cpython-39.pyc
+epl_api/v1/__pycache__/__init__.cpython-39.pyc
+epl_api/v1/__pycache__/helper.cpython-39.pyc
