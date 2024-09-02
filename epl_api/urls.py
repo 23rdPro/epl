@@ -14,9 +14,11 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
-from django.contrib import admin
-from django.urls import path
+from fastapi import APIRouter, status
 
-urlpatterns = [
-    # path('admin/', admin.site.urls),
-]
+from epl_api.v1.schema import PlayerStatsSchema
+from epl_api.views import get_root, get_p_stats
+
+router = APIRouter()
+router.get("/", status_code=status.HTTP_200_OK)(get_root)
+router.get("/stats/{p_name}", status_code=status.HTTP_200_OK, summary="get player stats", tags="pl-stats")(get_p_stats)

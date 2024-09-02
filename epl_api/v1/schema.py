@@ -1,3 +1,4 @@
+from typing import List, Optional
 from pydantic import BaseModel
 
 class AttackSchema(BaseModel):
@@ -47,10 +48,14 @@ class PlayerStatsSchema(ClubSchema):
     goals: int
     wins: int
     losses: int
-    attack: AttackSchema
-    team_play: TeamPlaySchema
-    discipline: DisciplineSchema
-    defence: DefenceSchema
+    attack: Optional[AttackSchema]
+    team_play: Optional[TeamPlaySchema]
+    discipline: Optional[DisciplineSchema]
+    defence: Optional[DefenceSchema]
+    
+    
+class PlayerStatsSchemas(BaseModel):
+    players: List[PlayerStatsSchema]
     
 class FixtureSchema(BaseModel):
     home: ClubSchema 
