@@ -17,8 +17,9 @@ Including another URLconf
 from fastapi import APIRouter, status
 
 from epl_api.v1.schema import PlayerStatsSchema
-from epl_api.views import get_root, get_p_stats
+from epl_api.views import get_root, get_p_stats, get_table
 
 router = APIRouter()
 router.get("/", status_code=status.HTTP_200_OK)(get_root)
 router.get("/stats/{p_name}", status_code=status.HTTP_200_OK, summary="get player stats", tags="pl-stats")(get_p_stats)
+router.get("/table", status_code=status.HTTP_200_OK, summary="get epl table", tags="epl-table")(get_table)
