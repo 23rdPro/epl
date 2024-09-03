@@ -5,8 +5,6 @@ from fastapi import Request, status
 from fastapi.responses import JSONResponse
 from django.core.cache import cache
 from playwright.async_api import async_playwright
-from django.conf import settings
-
 from epl_api.v1.utils import cache_result
 
 
@@ -61,8 +59,6 @@ async def get_table():
                     "gd": cells[8].text.strip(),
                     "points": cells[9].text.strip(),
                     "form": cells[10].text.strip() if len(cells) > 10 else None,
-                    "next": cells[11].text.strip() if len(cells) > 11 else None,
-                    "more": cells[12].text.strip() if len(cells) > 12 else None,
                 }
             )
 
