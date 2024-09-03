@@ -16,7 +16,8 @@ async def get_p_stats(p_name: str, request: Request):
     cached_stats = cache.get(key)
     if cached_stats:
         print("cache hit>>>>>>>>>>>>>>>>>>>>>>>>")
-        return JSONResponse(content=PlayerStatsSchema(**cached_stats))
+        # to maintain return type, use PlayerStatsSchemas
+        return PlayerStatsSchemas(players=PlayerStatsSchema(**cached_stats))
 
     stats = await get_player_stats(p_name)
     if not stats:
