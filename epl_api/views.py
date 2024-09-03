@@ -5,6 +5,7 @@ from epl_api.v1.schema import (
     FixtureSchema,
     PlayerStatsSchema,
     PlayerStatsSchemas,
+    ResultSchema,
 )
 from fastapi import Request, status
 from fastapi.responses import JSONResponse
@@ -14,6 +15,48 @@ from epl_api.v1.utils import cache_result
 
 async def get_root():
     return {"message": "Welcome to the EPL API"}
+
+
+@cache_result("epl_results")
+async def get_results():
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        page = await browser.new_page()
+        await page.goto("https://www.premierleague.com")
+
+        # Click on the "Results" link
+        await page.click('a[href="/results"][data-link-index="2"]')
+
+        # "First Team" tab to load and click on it
+        await page.wait_for_selector('li[data-tab-index="0"][data-text="First Team"]')
+        await page.click('li[data-tab-index="0"][data-text="First Team"]')
+
+        # Wait for the results to load
+        await page.wait_for_selector("li.match-fixture")
+
+        # Parse page content 
+        content = await page.content()
+        soup = BeautifulSoup(content, "lxml")
+        await browser.close()
+
+        # Extract result data
+        results = []
+        result_elements = soup.select("li.match-fixture")
+        for result in result_elements:
+            home_team = result["data-home"]
+            away_team = result["data-away"]
+            score = result.select_one(".match-fixture__score").text.strip()
+
+            # Structure the data using the schemas
+            result_data = ResultSchema(
+                home=ClubSchema(name=home_team),
+                away=ClubSchema(name=away_team),
+                score=score,
+            )
+            results.append(result_data)
+
+        # Return the structured data
+        return JSONResponse(content={"results": [result.dict() for result in results]})
 
 
 @cache_result("epl_fixture")
