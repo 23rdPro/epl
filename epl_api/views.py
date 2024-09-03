@@ -1,15 +1,57 @@
 from bs4 import BeautifulSoup
 from epl_api.v1.helper import extract_player_stats, get_player_stats
-from epl_api.v1.schema import PlayerStatsSchema, PlayerStatsSchemas
+from epl_api.v1.schema import ClubSchema, FixtureSchema, PlayerStatsSchema, PlayerStatsSchemas
 from fastapi import Request, status
 from fastapi.responses import JSONResponse
-from django.core.cache import cache
 from playwright.async_api import async_playwright
 from epl_api.v1.utils import cache_result
 
 
 async def get_root():
     return {"message": "Welcome to the EPL API"}
+
+
+@cache_result("epl_fixture")
+async def get_fixtures():
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        page = await browser.new_page()
+        await page.goto("https://www.premierleague.com")
+
+        # Click on the "Fixtures" link
+        await page.click('a[href="/fixtures"][data-link-index="1"]')
+
+        # Wait for the "First Team" tab to load and click on it
+        await page.wait_for_selector('li[data-tab-index="0"][data-text="First Team"]')
+        await page.click('li[data-tab-index="0"][data-text="First Team"]')
+
+        # Wait for the fixtures to load
+        await page.wait_for_selector('li.match-fixture')
+
+        # Parse page content with BeautifulSoup
+        content = await page.content()
+        soup = BeautifulSoup(content, "lxml")
+        await browser.close()
+
+        # Extract fixture data
+        fixtures = []
+        fixture_elements = soup.select('li.match-fixture')
+        for fixture in fixture_elements:
+            home_team = fixture['data-home']
+            away_team = fixture['data-away']
+            kickoff_time = fixture.time['datetime']
+
+            # Structure the data using the schemas
+            fixture_data = FixtureSchema(
+                home=ClubSchema(name=home_team),
+                away=ClubSchema(name=away_team),
+                time=kickoff_time
+            )
+            fixtures.append(fixture_data)
+            
+        # Return the structured data
+        return JSONResponse(content={"fixtures": [fixture.dict() for fixture in fixtures]})
+
 
 
 @cache_result("epl_table")
