@@ -1,6 +1,5 @@
 from typing import List, TypeVar as T
 from bs4 import BeautifulSoup
-from aiohttp import ClientConnectionError, ClientSession  # TODO uninstall
 from playwright.async_api import async_playwright
 from epl_api.v1.schema import (
     AttackSchema,
