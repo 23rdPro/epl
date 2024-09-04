@@ -34,7 +34,7 @@ async def get_results():
         # Wait for the results to load
         await page.wait_for_selector("li.match-fixture")
 
-        # Parse page content 
+        # Parse page content
         content = await page.content()
         soup = BeautifulSoup(content, "lxml")
         await browser.close()
