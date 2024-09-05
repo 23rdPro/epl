@@ -11,7 +11,10 @@ def cache_result(key_func: Union[str, Callable[..., str]]):
         async def wrapper(*args, **kwargs):
             key = key_func(*args, **kwargs) if callable(key_func) else key_func
 
-            cached_data = await cache.get(key)
+            try:
+                cached_data = await cache.get(key)
+            except TypeError:
+                cached_data = cache.get(key)
             if cached_data:
                 return cached_data
             result = await func(*args, **kwargs)
