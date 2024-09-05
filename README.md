@@ -75,3 +75,11 @@ Retrieves Premier League results.
 ```sh
 pip install -r requirements.txt
 ```
+
+3. Run the application:
+
+```sh
+uvicorn epl_api.asgi:app --reload
+```
+
+The application will run for as long as you let it.
