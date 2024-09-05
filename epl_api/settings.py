@@ -135,5 +135,3 @@ CACHES = {
         }
     }
 }
-
-CACHE_TIMEOUT = 72 * 60 * 60  # 72 hours

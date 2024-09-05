@@ -1,7 +1,6 @@
 from bs4 import BeautifulSoup
 from epl_api.v1.helper import extract_player_stats, get_player_stats
 from epl_api.v1.schema import (
-    ClubSchema,
     FixtureSchema,
     PlayerStatsSchema,
     PlayerStatsSchemas,
@@ -13,7 +12,7 @@ from playwright.async_api import async_playwright
 from epl_api.v1.utils import cache_result
 
 
-async def get_root():
+def get_root():
     return {"message": "Welcome to the EPL API"}
 
 
@@ -45,18 +44,18 @@ async def get_results():
         for result in result_elements:
             home_team = result["data-home"]
             away_team = result["data-away"]
-            score = result.select_one(".match-fixture__score").text.strip()
+            score = result['select_one'](".match-fixture__score").text.strip()
 
             # Structure the data using the schemas
             result_data = ResultSchema(
-                home=ClubSchema(name=home_team),
-                away=ClubSchema(name=away_team),
+                home=home_team,
+                away=away_team,
                 score=score,
             )
             results.append(result_data)
 
         # Return the structured data
-        return JSONResponse(content={"results": [result.dict() for result in results]})
+        return JSONResponse(content=[result.model_dump() for result in results])
 
 
 @cache_result("epl_fixture")
@@ -86,19 +85,19 @@ async def get_fixtures():
         for fixture in fixture_elements:
             home_team = fixture["data-home"]
             away_team = fixture["data-away"]
-            kickoff_time = fixture.time["datetime"]
+            kickoff_time = fixture["time"]
 
             # Structure the data using the schemas
             fixture_data = FixtureSchema(
-                home=ClubSchema(name=home_team),
-                away=ClubSchema(name=away_team),
+                home=home_team,
+                away=away_team,
                 time=kickoff_time,
             )
             fixtures.append(fixture_data)
 
         # Return the structured data
         return JSONResponse(
-            content={"fixtures": [fixture.dict() for fixture in fixtures]}
+            content={"fixtures": [fixture.model_dump() for fixture in fixtures]}
         )
 
 
@@ -178,7 +177,7 @@ async def get_p_stats(p_name: str, request: Request):
             "full_name": full_name_filter,
         }
         # Filter the results based on the additional criteria
-        for key, item in enumerate(filters.items()):
+        for key, item in filters.items():
             if item:
                 stats = [
                     player for player in stats if player[key].lower() == item.lower()
@@ -190,4 +189,5 @@ async def get_p_stats(p_name: str, request: Request):
         player_stats = await extract_player_stats(player["link"])
         stats = [PlayerStatsSchema(**player_stats)]
     # combined stats if filter still > 1 to perform more specific filters
-    return PlayerStatsSchemas(players=[PlayerStatsSchema(**player) for player in stats])
+        return PlayerStatsSchema(**player_stats)
+    return PlayerStatsSchemas(players=stats)

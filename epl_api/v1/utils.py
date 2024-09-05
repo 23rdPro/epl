@@ -1,23 +1,24 @@
 from functools import wraps
+from typing import Any, Callable, Union
 from django.core.cache import cache
-from django.conf import settings
-from epl_api.v1.schema import PlayerStatsSchema, PlayerStatsSchemas
+
+CACHE_TIMEOUT = 72 * 60 * 60  # 72 hours
 
 
-def cache_result(key_func, timeout=settings.CACHE_TIMEOUT):
-    def decorator(func):
+def cache_result(key_func: Union[str, Callable[..., str]]):
+    def decorator(func: Callable[..., Any]):
         @wraps(func)
         async def wrapper(*args, **kwargs):
-            key = key_func(*args, **kwargs)
+            key = key_func(*args, **kwargs) if callable(key_func) else key_func
 
-            cached_data = cache.get(key)
+            cached_data = await cache.get(key)
             if cached_data:
-                print("cache hit>>>>>>>>>>>>>>>>>>>>>>>>")
                 return cached_data
-                # return PlayerStatsSchemas(players=[PlayerStatsSchema(**cached_data)])
             result = await func(*args, **kwargs)
-            cache.set(key, result, timeout=settings.CACHE_TIMEOUT)
+            await cache.set(key, result, timeout=CACHE_TIMEOUT)
             return result
 
         return wrapper
+
     return decorator
+

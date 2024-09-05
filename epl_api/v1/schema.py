@@ -1,83 +1,82 @@
 from typing import List, Optional
 from pydantic import BaseModel
 
+
 class AttackSchema(BaseModel):
-    goals: int 
-    goals_per_match: float
-    headed_goals: int 
-    goals_with_left: int 
-    goals_with_right: int
-    scored_pks: int 
-    scored_free_kicks: int 
-    shots: int 
-    shots_on_target: int 
-    shooting_accuracy: float 
-    hit_woodwork: int
-    big_chances_missed: int 
-    
-    
+    goals: Optional[int] = 0
+    goals_per_match: Optional[float] = 0
+    headed_goals: Optional[int] = 0
+    goals_with_left: Optional[int] = 0
+    goals_with_right: Optional[int] = 0
+    scored_pks: Optional[int] = 0
+    scored_free_kicks: Optional[int] = 0
+    shots: Optional[int] = 0
+    shots_on_target: Optional[int] = 0
+    shooting_accuracy: Optional[float] = 0
+    hit_woodwork: Optional[int] = 0
+    big_chances_missed: Optional[int] = 0
+
+
 class TeamPlaySchema(BaseModel):
-    assists: int
-    passes: int 
-    passes_per_match: float
-    big_chances_created: int
-    crosses: int 
-    
-    
+    assists: Optional[int] = 0
+    passes: Optional[int] = 0
+    passes_per_match: Optional[float] = 0
+    big_chances_created: Optional[int] = 0 
+    crosses: Optional[int] = 0
+
+
 class DisciplineSchema(BaseModel):
-    yellow_cards: int 
-    red_cards: int 
-    fouls: int 
-    offside: int 
-    
-    
+    yellow_cards: Optional[int] = 0
+    red_cards: Optional[int] = 0
+    fouls: Optional[int] = 0
+    offside: Optional[int] = 0
+
+
 class DefenceSchema(BaseModel):
-    tackles: int 
-    blocked_shots: int 
-    interceptions: int 
-    clearances: int 
-    headed_clearance: int 
-    
-    
-class ClubSchema(BaseModel):
-    name: str 
-    
-class PlayerStatsSchema(ClubSchema):
-    player_name: str 
-    appearances: int 
-    goals: int
-    wins: int
-    losses: int
+    tackles: Optional[int] = 0
+    blocked_shots: Optional[int] = 0
+    interceptions: Optional[int] = 0
+    clearances: Optional[int] = 0
+    headed_clearance: Optional[int] = 0
+
+
+class PlayerStatsSchema(BaseModel):
+    player_name: str
+    appearances: Optional[int] = 0
+    goals: Optional[int] = 0
+    wins: Optional[int] = 0
+    losses: Optional[int] = 0
     attack: Optional[AttackSchema]
     team_play: Optional[TeamPlaySchema]
     discipline: Optional[DisciplineSchema]
     defence: Optional[DefenceSchema]
-    
-    
+
+
 class PlayerStatsSchemas(BaseModel):
     players: List[PlayerStatsSchema]
-    
+
+
 class FixtureSchema(BaseModel):
-    home: ClubSchema 
-    away: ClubSchema 
-    time: str 
-    
-    
+    home: str
+    away: str
+    time: str
+
+
 class TableSchema(BaseModel):
-    position: int 
-    club: ClubSchema
-    played: int
-    won: int 
-    drawn: int 
-    lost: int 
-    gf: int 
-    ga: int 
-    gd: int 
-    points: int 
-    form: str  
-    
-    
+    position: Optional[int] = 0
+    club: str
+    played: Optional[int] = 0
+    won: Optional[int] = 0
+    drawn: Optional[int] = 0
+    lost: Optional[int] = 0
+    gf: Optional[int] = 0
+    ga: Optional[int] = 0
+    gd: Optional[int] = 0
+    points: Optional[int] = 0
+    form: str
+
+
 class ResultSchema(BaseModel):
-    home: ClubSchema 
-    away: ClubSchema
-    score: str 
+    home: str
+    away: str
+    score: str
