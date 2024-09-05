@@ -61,5 +61,17 @@ Retrieves information about the next three Premier League fixtures.
   "Team A vs Team C DD/MM/YYYY HH:MM",
   "Team A vs Team D DD/MM/YYYY HH:MM"
 ]
+```
 
+### `GET /results`
+
+Retrieves Premier League results.
+
+### Setup Instructions
+
+1. Clone the repository.
+2. Open the terminal, navigate to the folder where your clone of this repository is located and type:
+
+```sh
+pip install -r requirements.txt
 ```
