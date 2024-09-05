@@ -26,6 +26,7 @@ Retrieves information about a Premier League player with the given name. The pla
     "name": "name", 
     // todo
 }
+```
 
 ### `GET /table`
 
