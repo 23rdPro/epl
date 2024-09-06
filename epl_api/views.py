@@ -44,7 +44,7 @@ async def get_results():
         for result in result_elements:
             home_team = result["data-home"]
             away_team = result["data-away"]
-            score = result['select_one'](".match-fixture__score").text.strip()
+            score = result["select_one"](".match-fixture__score").text.strip()
 
             # Structure the data using the schemas
             result_data = ResultSchema(
@@ -109,6 +109,7 @@ async def get_table():
         await page.goto("https://www.premierleague.com")
 
         # Click on the "Tables" link
+        await page.wait_for_selector('a[data-link-index="3"][role="menuitem"]')
         await page.click('a[data-link-index="3"][role="menuitem"]')
 
         # click on "First Team" tab
@@ -154,40 +155,28 @@ async def get_table():
         return league_table
 
 
-@cache_result(
-    lambda p_name, request: f"player_stats_{p_name.lower()}_{request.query_params}"
-)
-async def get_p_stats(p_name: str, request: Request):
+@cache_result(lambda p_name: f"player_stats_{''.join(p_name.split(' ')).lower()}")
+async def get_p_stats(p_name: str):
     stats = await get_player_stats(p_name)
     if not stats:
         return JSONResponse(
-            {"error": "Failed to retrieve stats"},
+            {"error get_player_stats": "Failed to retrieve stats"},
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
-
-    if len(stats) > 1:
-        # Extract filters from the query parameters
-        position_filter: str = request.get("position")
-        nationality_filter: str = request.get("nationality")
-        full_name_filter: str = request.get("player")
-
-        filters = {
-            "position": position_filter,
-            "nationality": nationality_filter,
-            "full_name": full_name_filter,
+    combined = [
+        {
+            "player_name": (player_stats := await extract_player_stats(player["link"]))[
+                "player_name"
+            ],
+            "appearances": player_stats["appearances"],
+            "goals": player_stats["goals"],
+            "wins": player_stats["wins"],
+            "losses": player_stats["losses"],
+            "attack": player_stats["attack"],
+            "team_play": player_stats["team_play"],
+            "discipline": player_stats["discipline"],
+            "defence": player_stats["defence"],
         }
-        # Filter the results based on the additional criteria
-        for key, item in filters.items():
-            if item:
-                stats = [
-                    player for player in stats if player[key].lower() == item.lower()
-                ]
-
-    if len(stats) == 1:
-        # retrieve one player stats directly
-        player = stats[0]
-        player_stats = await extract_player_stats(player["link"])
-        stats = [PlayerStatsSchema(**player_stats)]
-    # combined stats if filter still > 1 to perform more specific filters
-        return PlayerStatsSchema(**player_stats)
-    return PlayerStatsSchemas(players=stats)
+        for player in stats
+    ]
+    return [PlayerStatsSchema(**p_stat) for p_stat in combined]

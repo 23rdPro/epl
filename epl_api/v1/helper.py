@@ -13,16 +13,15 @@ async def get_player_stats(player_name: str) -> List[T]:  # TODO: return generat
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
-        await page.goto("https://www.premierleague.com/players")
-
-        # Wait for the search box
+        await page.goto("https://www.premierleague.com/players", wait_until='load', timeout=15000)
+        await page.wait_for_selector('input[placeholder="Search for a Player"]')
         await page.fill('input[placeholder="Search for a Player"]', player_name)
 
         # [Enter]: to submit the search
         await page.keyboard.press("Enter")
 
         # Wait for the player data
-        await page.wait_for_selector("tbody.dataContainer.indexSection")
+        await page.wait_for_selector("tbody.dataContainer.indexSection", timeout=15000)
 
         # Extract the HTML
         content = await page.content()
@@ -128,7 +127,7 @@ async def extract_player_stats(page: str):
         page = await browser.new_page()
 
         # Go to the player's specific page
-        await page.goto(page)
+        await page.goto(page, wait_until="load", timeout=15000)
 
         # Navigate to the "Stats" section
         await page.click('a.generic-tabs-nav__link[data-text="Stats"]')
@@ -153,10 +152,10 @@ async def extract_player_stats(page: str):
         wins = stats_section.find("span", class_="wins").text.strip()
         losses = stats_section.find("span", class_="losses").text.strip()
 
-        attack = extract_attack_stats(stats_section)
-        team_play = extract_team_play_stats(stats_section)
-        discipline = extract_discipline_stats(stats_section)
-        defence = extract_defence_stats(stats_section)
+        attack: AttackSchema = extract_attack_stats(stats_section)
+        team_play: TeamPlaySchema = extract_team_play_stats(stats_section)
+        discipline: DisciplineSchema = extract_discipline_stats(stats_section)
+        defence: DefenceSchema = extract_defence_stats(stats_section)
 
         player_stats = {
             "player_name": player_name,

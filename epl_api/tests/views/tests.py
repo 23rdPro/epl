@@ -423,8 +423,6 @@ async def test_get_p_stats(
     mock_cache.set = AsyncMock()
 
     # Setup a mock request with query parameters
-    request = MagicMock(spec=Request)
-    request.query_params = {"position": "Midfielder"}
 
     # Mock data for the extract_player_stats function
     mock_extract_player_stats.return_value = {
@@ -440,7 +438,7 @@ async def test_get_p_stats(
     }
 
     # Call the function under test
-    response = await get_p_stats("John Doe", request)
+    response = await get_p_stats("John Doe")
 
     # Verify the correct schema was used and returned
     # assert isinstance(response, (PlayerStatsSchemas, PlayerStatsSchema))
@@ -475,11 +473,11 @@ async def test_get_p_stats_cache_hit(mock_cache, mock_get_player_stats):
     mock_cache.get = AsyncMock(return_value=cached_data)
 
     # Setup a mock request
-    request = MagicMock(spec=Request)
-    request.query_params = {}
+    # request = MagicMock(spec=Request)
+    # request.query_params = {}
 
     # Call the function under test
-    response = await get_p_stats("John Doe", request)
+    response = await get_p_stats("John Doe")
 
     # Verify the response matches the cached data
     assert response == cached_data
