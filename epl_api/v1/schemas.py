@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Optional
 from pydantic import BaseModel
 
 
@@ -51,11 +51,6 @@ class PlayerStatsSchema(BaseModel):
     discipline: Optional[DisciplineSchema]
     defence: Optional[DefenceSchema]
 
-
-class PlayerStatsSchemas(BaseModel):
-    players: List[PlayerStatsSchema]
-
-
 class FixtureSchema(BaseModel):
     home: str
     away: str
@@ -63,17 +58,17 @@ class FixtureSchema(BaseModel):
 
 
 class TableSchema(BaseModel):
-    position: Optional[int] = 0
+    position: Optional[str] = ""
     club: str
-    played: Optional[int] = 0
-    won: Optional[int] = 0
-    drawn: Optional[int] = 0
-    lost: Optional[int] = 0
-    gf: Optional[int] = 0
-    ga: Optional[int] = 0
-    gd: Optional[int] = 0
-    points: Optional[int] = 0
-    form: str
+    played: Optional[str] = ""
+    won: Optional[str] = ""
+    drawn: Optional[str] = ""
+    lost: Optional[str] = ""
+    gf: Optional[str] = ""
+    ga: Optional[str] = ""
+    gd: Optional[str] = ""
+    points: Optional[str] = ""
+    form: Optional[str] = ""
 
 
 class ResultSchema(BaseModel):

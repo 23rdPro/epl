@@ -1,15 +1,16 @@
 from bs4 import BeautifulSoup
-from epl_api.v1.helper import extract_player_stats, get_player_stats
-from epl_api.v1.schema import (
+from epl_api.v1.dependencies import get_page
+from epl_api.v1.helpers import extract_player_stats
+from epl_api.v1.schemas import (
     FixtureSchema,
     PlayerStatsSchema,
-    PlayerStatsSchemas,
     ResultSchema,
+    TableSchema,
 )
-from fastapi import Request, status
+from fastapi import Depends, status
 from fastapi.responses import JSONResponse
-from playwright.async_api import async_playwright
-from epl_api.v1.utils import cache_result
+from playwright.async_api import async_playwright, TimeoutError
+from epl_api.v1.utils import cache_result, format_league_table, onetrust_accept_cookie
 
 
 def get_root():
@@ -58,7 +59,7 @@ async def get_results():
         return JSONResponse(content=[result.model_dump() for result in results])
 
 
-@cache_result("epl_fixture")
+# @cache_result("epl_fixture")
 async def get_fixtures():
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
@@ -102,81 +103,39 @@ async def get_fixtures():
 
 
 @cache_result("epl_table")
-async def get_table():
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        page = await browser.new_page()
-        await page.goto("https://www.premierleague.com")
+async def get_table(page=Depends(get_page)):
+    await page.goto("https://www.premierleague.com/tables")
+    # accept cookie
+    await onetrust_accept_cookie(page)
+    # click on "First Team" tab
+    await page.wait_for_selector('li[data-tab-index="0"][data-text="First Team"]')
+    await page.click('li[data-tab-index="0"][data-text="First Team"]')
 
-        # Click on the "Tables" link
-        await page.wait_for_selector('a[data-link-index="3"][role="menuitem"]')
-        await page.click('a[data-link-index="3"][role="menuitem"]')
+    # Wait for the table to load
+    await page.wait_for_selector(
+        "#mainContent div.league-table__all-tables-container.allTablesContainer table tbody"
+    )
 
-        # click on "First Team" tab
-        await page.wait_for_selector('li[data-tab-index="0"][data-text="First Team"]')
-        await page.click('li[data-tab-index="0"][data-text="First Team"]')
+    # parse page with BeautifulSoup
+    content = await page.content()
+    soup = BeautifulSoup(content, "lxml")
+    # await browser.close()
 
-        # Wait for the table to load
-        await page.wait_for_selector(
-            "#mainContent div.league-table__all-tables-container.allTablesContainer table tbody"
-        )
-
-        # parse page with BeautifulSoup
-        content = await page.content()
-        soup = BeautifulSoup(content, "lxml")
-        await browser.close()
-
-        # Extract the table rows
-        table = soup.select_one(
-            "#mainContent div.league-table__all-tables-container.allTablesContainer table tbody"
-        )
-        rows = table.find_all("tr")
-
-        # Parse the table rows into structured data
-        league_table = []
-        for row in rows:
-            cells = row.find_all("td")
-            league_table.append(
-                {
-                    "position": cells[0].text.strip(),
-                    "club": cells[1].text.strip(),
-                    "played": cells[2].text.strip(),
-                    "won": cells[3].text.strip(),
-                    "drawn": cells[4].text.strip(),
-                    "lost": cells[5].text.strip(),
-                    "gf": cells[6].text.strip(),
-                    "ga": cells[7].text.strip(),
-                    "gd": cells[8].text.strip(),
-                    "points": cells[9].text.strip(),
-                    "form": cells[10].text.strip() if len(cells) > 10 else None,
-                }
-            )
-
-        return league_table
+    # Extract the table rows
+    table = soup.select_one(
+        "#mainContent div.league-table__all-tables-container.allTablesContainer table tbody"
+    )
+    rows = table.find_all("tr")
+    format_data = format_league_table(rows)
+    return [TableSchema(**d) for d in format_data]
 
 
 @cache_result(lambda p_name: f"player_stats_{''.join(p_name.split(' ')).lower()}")
-async def get_p_stats(p_name: str):
-    stats = await get_player_stats(p_name)
+async def get_p_stats(p_name: str, page=Depends(get_page)):
+    stats = await extract_player_stats(p_name, page)
     if not stats:
         return JSONResponse(
             {"error get_player_stats": "Failed to retrieve stats"},
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
-    combined = [
-        {
-            "player_name": (player_stats := await extract_player_stats(player["link"]))[
-                "player_name"
-            ],
-            "appearances": player_stats["appearances"],
-            "goals": player_stats["goals"],
-            "wins": player_stats["wins"],
-            "losses": player_stats["losses"],
-            "attack": player_stats["attack"],
-            "team_play": player_stats["team_play"],
-            "discipline": player_stats["discipline"],
-            "defence": player_stats["defence"],
-        }
-        for player in stats
-    ]
-    return [PlayerStatsSchema(**p_stat) for p_stat in combined]
+    return [PlayerStatsSchema(**p_stat) for p_stat in stats]

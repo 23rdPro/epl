@@ -1,15 +1,14 @@
 from django.conf import settings
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from epl_api.v1.helper import (
+from epl_api.v1.helpers import (
     extract_attack_stats,
     extract_defence_stats,
     extract_discipline_stats,
-    extract_player_stats,
     extract_team_play_stats,
     get_player_stats,
 )
-from epl_api.v1.schema import (
+from epl_api.v1.schemas import (
     AttackSchema,
     DefenceSchema,
     DisciplineSchema,
