@@ -1,370 +1,122 @@
-from django.conf import settings
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from epl_api.v1.helpers import (
-    extract_attack_stats,
-    extract_defence_stats,
-    extract_discipline_stats,
-    extract_team_play_stats,
-    get_player_stats,
-)
-from epl_api.v1.schemas import (
-    AttackSchema,
-    DefenceSchema,
-    DisciplineSchema,
-    TeamPlaySchema,
-)
-from epl_api.v1.utils import cache_result
+from unittest.mock import AsyncMock
+
+import pytest_asyncio
+
+from epl_api.v1.helpers import extract_player_stats
 
 
-@pytest.mark.asyncio
-@patch("epl_api.v1.helper.async_playwright")
-async def test_get_player_stats(playwright_mocked):
-    brs = AsyncMock()
-    pge = AsyncMock()
-    playwright_mocked.return_value.__aenter__.return_value.chromium.launch.return_value = (
-        brs
-    )
-    brs.new_page.return_value = pge
-    _html = """
-    <div class="table playerIndex player-listing">
-        <tbody class="dataContainer indexSection">
-            <tr class="player">
-                <a class="player__name" href="/players/1234/Ilkay-Gundogan/overview">Ilkay Gundogan</a>
-                <td class="player__position">Midfielder</td>
-                <span class="player__country">Germany</span>
-            </tr>
-        </tbody>
-    </div>
+from unittest.mock import AsyncMock
+import pytest
+import pytest_asyncio
+
+@pytest_asyncio.fixture
+async def mock_page(mocker):
+    # Mock the Playwright Page object
+    page = mocker.Mock()
+
+    # Mock the content for the search page (player search results)
+    search_page_content = """
+    <tbody class="dataContainer indexSection">
+        <tr class="player">
+            <a class="player__name" href="/players/12345/player-name/overview">Test Player</a>
+            <td class="player__position">Midfielder</td>
+            <span class="player__country">Country Name</span>
+        </tr>
+    </tbody>
     """
-    pge.content.return_value = _html
-    p_name = "Ilkay Gundogan"
-    result = await get_player_stats(player_name=p_name)
 
-    expected_result = [
-        {
-            "name": "Ilkay Gundogan",
-            "link": "https://www.premierleague.com/players/1234/Ilkay-Gundogan/overview",
-            "position": "Midfielder",
-            "nationality": "Germany",
-        },
-    ]
-    assert result == expected_result
-    await pge.close()
-    # pge.goto.assert_called_once_with("https://www.premierleague.com/players")
-    # pge.fill.assert_called_once_with('input[placeholder="Search for a Player"]', p_name)
-    # pge.keyboard.press.assert_called_once_with("Enter")
-    # pge.wait_for_selector.assert_called_once_with("tbody.dataContainer.indexSection")
-    # pge.content.assert_called_once()
-    # pge.close.assert_called_once()
-
-
-@pytest.mark.asyncio
-async def test_extract_attack_stats():
-    # Mock BeautifulSoup
-    bs = MagicMock()
-
-    # Mock the `find` method and its return value's `text.strip()`
-    bs.find.side_effect = lambda class_name, class_: MagicMock(
-        text=MagicMock(
-            strip=MagicMock(
-                return_value={
-                    "goals": "10",
-                    "goals_per_match": "0.5",
-                    "headed_goals": "2",
-                    "goals_with_left": "3",
-                    "goals_with_right": "5",
-                    "scored_pks": "1",
-                    "scored_free_kicks": "0",
-                    "shots": "30",
-                    "shots_on_target": "15",
-                    "shooting_accuracy": "50%",
-                    "hit_woodwork": "2",
-                    "big_chances_missed": "4",
-                }[class_]
-            )
-        )
-    )
-    result = await extract_attack_stats(bs)
-
-    expected_result = AttackSchema(
-        goals=10,
-        goals_per_match=0.5,
-        headed_goals=2,
-        goals_with_left=3,
-        goals_with_right=5,
-        scored_pks=1,
-        scored_free_kicks=0,
-        shots=30,
-        shots_on_target=15,
-        shooting_accuracy=50.0,
-        hit_woodwork=2,
-        big_chances_missed=4,
-    )
-
-    assert result == expected_result
-
-    expected_calls = [
-        ("span", "goals"),
-        ("span", "goals_per_match"),
-        ("span", "headed_goals"),
-        ("span", "goals_with_left"),
-        ("span", "goals_with_right"),
-        ("span", "scored_pks"),
-        ("span", "scored_free_kicks"),
-        ("span", "shots"),
-        ("span", "shots_on_target"),
-        ("span", "shooting_accuracy"),
-        ("span", "hit_woodwork"),
-        ("span", "big_chances_missed"),
-    ]
-    # assert bs.find.call_args_list == [((key, value),) for key, value in expected_calls]
-
-
-@pytest.mark.asyncio
-async def test_extract_team_play_stats():
-    bs = MagicMock()
-    bs.find.side_effect = lambda class_name, class_: MagicMock(
-        text=MagicMock(
-            strip=MagicMock(
-                return_value={
-                    "assists": "7",
-                    "passes": "1200",
-                    "passes_per_match": "85.7",
-                    "big_chances_created": "10",
-                    "crosses": "50",
-                }[class_]
-            )
-        )
-    )
-
-    result = await extract_team_play_stats(bs)
-
-    expected_result = TeamPlaySchema(
-        assists=7,
-        passes=1200,
-        passes_per_match=85.7,
-        big_chances_created=10,
-        crosses=50,
-    )
-
-    assert result == expected_result
-
-    expected_calls = [
-        ("span", "assists"),
-        ("span", "passes"),
-        ("span", "passes_per_match"),
-        ("span", "big_chances_created"),
-        ("span", "crosses"),
-    ]
-    # assert bs.find.call_args_list == [((key, value),) for key, value in expected_calls]
-
-
-@pytest.mark.asyncio
-async def test_extract_discipline_stats():
-    bs = MagicMock()
-    bs.find.side_effect = lambda class_name, class_: MagicMock(
-        text=MagicMock(
-            strip=MagicMock(
-                return_value={
-                    "yellow_cards": "5",
-                    "red_cards": "1",
-                    "fouls": "30",
-                    "offside": "10",
-                }[class_]
-            )
-        )
-    )
-    result = await extract_discipline_stats(bs)
-
-    expected_result = DisciplineSchema(
-        yellow_cards=5,
-        red_cards=1,
-        fouls=30,
-        offside=10,
-    )
-
-    assert result == expected_result
-
-    expected_calls = [
-        ("span", "yellow_cards"),
-        ("span", "red_cards"),
-        ("span", "fouls"),
-        ("span", "offside"),
-    ]
-    # assert bs.find.call_args_list == [((key, value),) for key, value in expected_calls]
-
-
-@pytest.mark.asyncio
-async def test_extract_defence_stats():
-    bs = MagicMock()
-    bs.find.side_effect = lambda class_name, class_: MagicMock(
-        text=MagicMock(
-            strip=MagicMock(
-                return_value={
-                    "tackles": "45",
-                    "blocked_shots": "10",
-                    "interceptions": "20",
-                    "clearances": "50",
-                    "headed_clearance": "25",
-                }[class_]
-            )
-        )
-    )
-
-    result = await extract_defence_stats(bs)
-
-    expected_result = DefenceSchema(
-        tackles=45,
-        blocked_shots=10,
-        interceptions=20,
-        clearances=50,
-        headed_clearance=25,
-    )
-
-    assert result == expected_result
-
-    expected_calls = [
-        ("span", "tackles"),
-        ("span", "blocked_shots"),
-        ("span", "interceptions"),
-        ("span", "clearances"),
-        ("span", "headed_clearance"),
-    ]
-    # assert bs.find.call_args_list == [((key, value),) for key, value in expected_calls]
-
-
-@pytest.mark.asyncio
-@patch("epl_api.v1.helper.async_playwright")
-async def test_extract_player_stats(mock_playwright_extract):
-    pytest.skip("Todo")
-    brs = AsyncMock()
-    pge = AsyncMock()
-    mock_playwright_extract.return_value.__aenter__.return_value.chromium.launch.return_value.__aenter__.return_value = (
-        brs
-    )
-    brs.new_page.return_value = pge
-
-    _html = """
-    <div class="player-stats">
-        <span class="appearances">30</span>
-        <span class="goals">10</span>
-        <span class="wins">20</span>
-        <span class="losses">5</span>
+    # Mock the content for the stats page (player stats)
+    stats_page_content = """
+    <div class="player-stats__top-stats">
+        <span class="statappearances">50</span>
+        <span class="statgoals">15</span>
+        <span class="statwins">30</span>
+        <span class="statlosses">20</span>
     </div>
-    <div class="name">Test Player</div>
+    <li class="player-stats__stat">
+        <div>Attack</div>
+        <div class="player-stats__stat-value">goals<span class="allStatContainer">10</span></div>
+        <div class="player-stats__stat-value">goals_per_match<span class="allStatContainer">5.6</span></div>
+        <div class="player-stats__stat-value">headed_goals<span class="allStatContainer">5</span></div>
+        <div class="player-stats__stat-value">goals_with_left<span class="allStatContainer">5</span></div>
+        <div class="player-stats__stat-value">goals_with_right<span class="allStatContainer">5</span></div>
+        <div class="player-stats__stat-value">scored_pks<span class="allStatContainer">5</span></div>
+        <div class="player-stats__stat-value">scored_free_kicks<span class="allStatContainer">5</span></div>
+        <div class="player-stats__stat-value">shots<span class="allStatContainer">5</span></div>
+        <div class="player-stats__stat-value">shots_on_target<span class="allStatContainer">5</span></div>
+        <div class="player-stats__stat-value">shooting accuracy %<span class="allStatContainer">5%</span></div>
+        
+        <div class="player-stats__stat-value">shooting_accuracy<span class="allStatContainer">5</span></div>
+        <div class="player-stats__stat-value">shots_on_target<span class="allStatContainer">5</span></div>
+        <div class="player-stats__stat-value">hit_woodwork<span class="allStatContainer">5</span></div>
+        <div class="player-stats__stat-value">big_chances_missed<span class="allStatContainer">5</span></div>
+    </li>
+    <li class="player-stats__stat">
+        <div>Team Play</div>
+        <div class="player-stats__stat-value">assists<span class="allStatContainer">7</span></div>
+        <div class="player-stats__stat-value">passes<span class="allStatContainer">7</span></div>
+        <div class="player-stats__stat-value">passes_per_match<span class="allStatContainer">7</span></div>
+        <div class="player-stats__stat-value">big_chances_created<span class="allStatContainer">7</span></div>
+        <div class="player-stats__stat-value">crosses<span class="allStatContainer">7</span></div>
+    </li>
+    <li class="player-stats__stat">
+        <div>Discipline</div>
+        <div class="player-stats__stat-value">yellow_cards<span class="allStatContainer">7</span></div>
+        <div class="player-stats__stat-value">red_cards<span class="allStatContainer">7</span></div>
+        <div class="player-stats__stat-value">fouls<span class="allStatContainer">7</span></div>
+        <div class="player-stats__stat-value">offside<span class="allStatContainer">7</span></div>
+    </li>
+    <li class="player-stats__stat">
+        <div>Defence</div>
+        <div class="player-stats__stat-value">tackles<span class="allStatContainer">7</span></div>
+        <div class="player-stats__stat-value">blocked_shots<span class="allStatContainer">7</span></div>
+        <div class="player-stats__stat-value">interceptions<span class="allStatContainer">7</span></div>
+        <div class="player-stats__stat-value">clearances<span class="allStatContainer">7</span></div>
+        <div class="player-stats__stat-value">headed_clearance<span class="allStatContainer">7</span></div>
+        <div class="player-stats__stat-value">successful 50/50s<span class="allStatContainer">44</span></div>
+    </li>
     """
-    pge.content.return_value = _html
+    # Mock the cookie consent function
+    mocker.patch("epl_api.v1.helpers.onetrust_accept_cookie", new=AsyncMock())
 
-    with patch("epl_api.v1.helper.BeautifulSoup") as mock_soup, patch(
-        "epl_api.v1.helper.extract_attack_stats", return_value="mocked_attack"
-    ), patch("epl_api.v1.helper.extract_team_play_stats", return_value="mocked_team_play"), patch(
-        "epl_api.v1.helper.extract_discipline_stats", return_value="mocked_discipline"
-    ), patch(
-        "epl_api.v1.helper.extract_defence_stats", return_value="mocked_defence"
-    ):
+    # Set the page content mocks for both search and stats pages
+    page.content.side_effect = AsyncMock(side_effect=[search_page_content, stats_page_content])
+    page.goto = AsyncMock()
+    page.wait_for_selector = AsyncMock()
+    page.fill = AsyncMock()
+    page.keyboard.press = AsyncMock()
 
-        mock_soup.return_value.find.side_effect = lambda name, class_: MagicMock(
-            text=MagicMock(
-                strip=MagicMock(
-                    return_value={
-                        "appearances": "30",
-                        "goals": "10",
-                        "wins": "20",
-                        "losses": "5",
-                        "name": "Test Player",
-                    }[class_]
-                )
-            )
-        )
-
-        result = await extract_player_stats(
-            "https://www.premierleague.com/players/12345/Test-Player/overview"
-        )
-
-        expected_result = {
-            "player_name": "Test Player",
-            "appearances": 30,
-            "goals": 10,
-            "wins": 20,
-            "losses": 5,
-            "attack": "mocked_attack",
-            "team_play": "mocked_team_play",
-            "discipline": "mocked_discipline",
-            "defence": "mocked_defence",
-        }
-
-        # assert result == expected_result
-
-        # pge.goto.assert_called_once_with(
-        #     "https://www.premierleague.com/players/12345/Test-Player/overview"
-        # )
-        # pge.click.assert_called_once_with('a.generic-tabs-nav__link[data-text="Stats"]')
-        # pge.wait_for_selector.assert_called_once_with("div.player-stats")
-        # pge.close.assert_called_once()
-
-
-# Test other decorators
-
-
-class MockSettings:
-    CACHE_TIMEOUT = settings.CACHE_TIMEOUT
-
-
-@pytest.fixture
-def mock_settings():
-    return MockSettings()
-
+    return page
 
 @pytest.mark.asyncio
-@patch("epl_api.v1.utils.cache")
-async def test_cache_result_cache_hit(mock_cache, mock_settings):
-    mock_cache.get = AsyncMock(return_value={"mocked_key": "mocked_value"})
-    mock_cache.set = AsyncMock()
+async def test_extract_player_stats(mock_page):
+    # Call the extract_player_stats function with the mocked page
+    player_stats_generator = await extract_player_stats("Test Player", mock_page)
 
-    # function to decorate
-    async def sample_view_func(arg1, arg2):
-        return {"computed_key": f"{arg1}_{arg2}"}
+    # Convert the async generator to a list for testing
+    player_stats = [stat async for stat in player_stats_generator]
 
-    # key func for caching
-    def gen_key(arg1, arg2):
-        return f"cache_key_{arg1}_{arg2}"
+    # Assert that the extracted data matches the expected values
+    assert len(player_stats) == 1
+    player_data = player_stats[0]
+    
+    # Assert general stats
+    assert player_data["player_name"] == "Test Player"
+    assert player_data["appearances"] == "50"
+    assert player_data["goals"] == "15"
+    assert player_data["wins"] == "30"
+    assert player_data["losses"] == "20"
 
-    # Apply the decorator
-    decorated_func = cache_result(gen_key)(sample_view_func)
+    assert player_data["attack"]["goals"] == "10"
+    assert player_data["attack"]["shots"] == "5"
+    assert player_data["attack"]["shooting_accuracy"] == "5"
+    
+    assert player_data["team_play"]["assists"] == "7"
 
-    # Call the decorated function
-    result = await decorated_func("foo", "bar")
+    assert player_data["discipline"]["yellow_cards"] == "7"
+    assert player_data["discipline"]["red_cards"] == "7"
+    assert player_data["defence"]["tackles"] == "7"
+    assert player_data["defence"]["clearances"] == "7"
+    assert player_data["defence"]["successful_50_50s"] == "44"
 
-    # Assertions
-    assert result == {"mocked_key": "mocked_value"}
-    mock_cache.get.assert_called_once_with("cache_key_foo_bar")
-    mock_cache.set.assert_not_called()  # Should not be called if cache hit
-
-
-@pytest.mark.asyncio
-@patch("epl_api.v1.utils.cache")
-async def test_cache_result_cache_miss(mock_cache, mock_settings):
-    # Mock the cache get method to return None (cache miss)
-    mock_cache.get = AsyncMock(return_value=None)
-    mock_cache.set = AsyncMock()
-
-    async def sample_func(arg1, arg2):
-        return {"computed_key": f"{arg1}_{arg2}"}
-
-    def gen_key(arg1, arg2):
-        return f"cache_key_{arg1}_{arg2}"
-
-    decorated_func = cache_result(gen_key)(sample_func)
-
-    result = await decorated_func("foo", "bar")
-    # result = await result
-    expected_result = {"computed_key": "foo_bar"}
-
-
-    # Assertions
-    assert result == expected_result
-    mock_cache.get.assert_called_once_with("cache_key_foo_bar")
-    mock_cache.set.assert_called_once_with(
-        "cache_key_foo_bar", result, timeout=mock_settings.CACHE_TIMEOUT
-    )
