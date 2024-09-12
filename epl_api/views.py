@@ -47,12 +47,12 @@ async def get_results(page=Depends(get_page)):
                 "score": score,
             }
 
-        # Use a generator expression 
+        # Use a generator expression
         results = (extract_result_data(result) for result in result_elements)
 
         # Use another generator to directly yield the ResultSchema objects
         return (ResultSchema(**rsch) for rsch in results)
-    
+
 
 @cache_result("epl_table", use_generator=True)
 async def get_table(page=Depends(get_page)):
@@ -88,13 +88,17 @@ async def get_table(page=Depends(get_page)):
             return None
 
         clean_pos = lambda text: (
-            re.search(r"\d+", text).group(0) if text and re.search(r"\d+", text) else None
+            re.search(r"\d+", text).group(0)
+            if text and re.search(r"\d+", text)
+            else None
         )
 
         return {
             "position": clean_pos(cells[0].text.strip()),
             "club": (
-                cells[1].find("span", class_="league-table__team-name--long").text.strip()
+                cells[1]
+                .find("span", class_="league-table__team-name--long")
+                .text.strip()
                 if len(cells) > 1
                 else None
             ),
@@ -114,7 +118,10 @@ async def get_table(page=Depends(get_page)):
     return (TableSchema(**team_data) for team_data in league_table if team_data)
 
 
-@cache_result(lambda p_name: f"player_stats_{''.join(p_name.split(' ')).lower()}", use_generator=True)
+@cache_result(
+    lambda p_name: f"player_stats_{''.join(p_name.split(' ')).lower()}",
+    use_generator=True,
+)
 async def get_p_stats(p_name: str, page=Depends(get_page)):
     stats = await extract_player_stats(p_name, page)
     if not stats:

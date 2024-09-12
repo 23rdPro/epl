@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock
 import pytest
 import pytest_asyncio
 
+
 @pytest_asyncio.fixture
 async def mock_page(mocker):
     # Mock the Playwright Page object
@@ -81,13 +82,16 @@ async def mock_page(mocker):
     mocker.patch("epl_api.v1.helpers.onetrust_accept_cookie", new=AsyncMock())
 
     # Set the page content mocks for both search and stats pages
-    page.content.side_effect = AsyncMock(side_effect=[search_page_content, stats_page_content])
+    page.content.side_effect = AsyncMock(
+        side_effect=[search_page_content, stats_page_content]
+    )
     page.goto = AsyncMock()
     page.wait_for_selector = AsyncMock()
     page.fill = AsyncMock()
     page.keyboard.press = AsyncMock()
 
     return page
+
 
 @pytest.mark.asyncio
 async def test_extract_player_stats(mock_page):
@@ -100,7 +104,7 @@ async def test_extract_player_stats(mock_page):
     # Assert that the extracted data matches the expected values
     assert len(player_stats) == 1
     player_data = player_stats[0]
-    
+
     # Assert general stats
     assert player_data["player_name"] == "Test Player"
     assert player_data["appearances"] == "50"
@@ -111,7 +115,7 @@ async def test_extract_player_stats(mock_page):
     assert player_data["attack"]["goals"] == "10"
     assert player_data["attack"]["shots"] == "5"
     assert player_data["attack"]["shooting_accuracy"] == "5"
-    
+
     assert player_data["team_play"]["assists"] == "7"
 
     assert player_data["discipline"]["yellow_cards"] == "7"
@@ -119,4 +123,3 @@ async def test_extract_player_stats(mock_page):
     assert player_data["defence"]["tackles"] == "7"
     assert player_data["defence"]["clearances"] == "7"
     assert player_data["defence"]["successful_50_50s"] == "44"
-

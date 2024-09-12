@@ -1,30 +1,8 @@
 from asyncio import iscoroutine
 from functools import wraps
-import re
-from typing import Any, Callable, Generator, Union, TypeVar as T, List
+from typing import Any, Callable, Generator, Union
 from django.core.cache import cache
 from django.conf import settings
-
-
-# def cache_result(key_func: Union[str, Callable[..., str]]):
-
-#     def decorator(func: Callable[..., Any]):
-#         @wraps(func)
-#         async def wrapper(*args, **kwargs):
-#             func_args = {k: v for k, v in kwargs.items() if k != "page"}
-#             key = key_func(*args, **func_args) if callable(key_func) else key_func
-#             cached_data = cache.get(key)
-#             if iscoroutine(cached_data):
-#                 cached_data = await cached_data
-#             if cached_data:
-#                 return cached_data
-#             result = await func(*args, **kwargs)
-#             cache.set(key, result, timeout=settings.CACHE_TIMEOUT)
-#             return result
-
-#         return wrapper
-
-#     return decorator
 
 
 async def onetrust_accept_cookie(page):

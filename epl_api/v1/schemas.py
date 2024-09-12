@@ -12,11 +12,11 @@ class AttackSchema(BaseModel):
     freekicks_scored: Optional[str] = "N/A"
     shots: Optional[str] = "N/A"
     shots_on_target: Optional[str] = "N/A"
-    shooting_accuracy: Optional[str] = "N/A"  # percentage 
+    shooting_accuracy: Optional[str] = "N/A"  # percentage
     hit_woodwork: Optional[str] = "N/A"
     big_chances_missed: Optional[str] = "N/A"
-    
-    
+
+
 class GoalkeepingSchema(BaseModel):
     saves: Optional[str] = "N/A"
     penalties_saved: Optional[str] = "N/A"
@@ -35,7 +35,7 @@ class TeamPlaySchema(BaseModel):
     big_chances_created: Optional[str] = "N/A"
     crosses: Optional[str] = "N/A"
     cross_accuracy: Optional[str] = "N/A"
-    through_balls: Optional[str] = "N/A" 
+    through_balls: Optional[str] = "N/A"
     accurate_long_balls: Optional[str] = "N/A"
     goals: Optional[str] = "N/A"
 
@@ -66,9 +66,7 @@ class DefenceSchema(BaseModel):
     aerial_battles_lost: Optional[str] = "N/A"
     own_goals: Optional[str] = "N/A"
     errors_leading_to_goals: Optional[str] = "N/A"  # TODO: maybe not needed
-    errors_leading_to_goal: Optional[str] = "N/A" 
-    
-    
+    errors_leading_to_goal: Optional[str] = "N/A"
 
 
 class PlayerStatsSchema(BaseModel):
@@ -81,6 +79,7 @@ class PlayerStatsSchema(BaseModel):
     team_play: TeamPlaySchema
     discipline: DisciplineSchema
     defence: DefenceSchema
+
 
 class FixtureSchema(BaseModel):
     home: Optional[str] = "N/A"

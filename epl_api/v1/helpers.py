@@ -81,12 +81,12 @@ async def extract_p_stats(player_data: dict, page) -> dict:
             ),
             None,
         )
-        
+
     def _to_decimal(arg: str) -> str:
         if "%" in arg:
             return str(round(int(arg.replace("%", "").strip()) / 100, 2))
-        return arg 
-    
+        return arg
+
     # Function to map the schema with extracted stats
     def with_schema(section, schema: DefenceSchema):
         if not section:
@@ -96,20 +96,24 @@ async def extract_p_stats(player_data: dict, page) -> dict:
         # Extract stats from the section
         for stat_value in section.select("div.player-stats__stat-value"):
             # Split the stat name and value correctly
-            stat_name = '_'.join(k.lower() for k in stat_value.contents[0].strip().split(' '))
-            statval = stat_value.find("span", class_="allStatContainer").get_text().strip()
+            stat_name = "_".join(
+                k.lower() for k in stat_value.contents[0].strip().split(" ")
+            )
+            statval = (
+                stat_value.find("span", class_="allStatContainer").get_text().strip()
+            )
             stat_val = _to_decimal(statval)
             if stat_name and stat_val:
                 # Ensure stats are mapped correctly
                 stats_dict[stat_name] = stat_val
-                                                
+
         key_mapping = {
             "shooting_accuracy": "shooting_accuracy_%",
-            "successful_50_50s": "successful_50/50s"
+            "successful_50_50s": "successful_50/50s",
         }
-                
+
         filtered_stats = {}
-        
+
         for field in schema.model_fields:
             if field in stats_dict:
                 filtered_stats[field] = stats_dict[field]
@@ -123,7 +127,6 @@ async def extract_p_stats(player_data: dict, page) -> dict:
                     filtered_stats[field] = "N/A"
 
         return schema(**filtered_stats)
-
 
     # Mapping stats sections
     attack_section = filter_sections("Attack")
