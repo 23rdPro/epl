@@ -125,7 +125,7 @@ async def get_p_stats(p_name: str, page=Depends(get_page)):
             {"error get_player_stats": "Failed to retrieve stats"},
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
-    return [PlayerStatsSchema(**p_stat) async for p_stat in stats]
+    return [PlayerStatsSchema(**p_stat) for p_stat in stats]
 
 
 # @cache_result("epl_fixture")  TODO

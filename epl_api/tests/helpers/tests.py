@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import pytest_asyncio
 
@@ -78,9 +78,6 @@ async def mock_page(mocker):
         <div class="player-stats__stat-value">successful 50/50s<span class="allStatContainer">44</span></div>
     </li>
     """
-    # Mock the cookie consent function
-    # mocker.patch("epl_api.v1.helpers.onetrust_accept_cookie", new=AsyncMock())
-
     # Set the page content mocks for both search and stats pages
     page.content.side_effect = AsyncMock(
         side_effect=[search_page_content, stats_page_content]
@@ -94,7 +91,9 @@ async def mock_page(mocker):
 
 
 @pytest.mark.asyncio
-async def test_extract_player_stats(mock_page):
+@patch("epl_api.v1.helpers.onetrust_accept_cookie")
+async def test_extract_player_stats(cookie, mock_page):
+    
     # Call the extract_player_stats function with the mocked page
     player_stats_generator = await extract_player_stats("Test Player", mock_page)
 
@@ -123,3 +122,4 @@ async def test_extract_player_stats(mock_page):
     assert player_data["defence"]["tackles"] == "7"
     assert player_data["defence"]["clearances"] == "7"
     assert player_data["defence"]["successful_50_50s"] == "44"
+    assert cookie.call_count == 2  # on search and stats load
