@@ -13,10 +13,8 @@ import pytest_asyncio
 
 @pytest_asyncio.fixture
 async def mock_page(mocker):
-    # Mock the Playwright Page object
     page = mocker.Mock()
 
-    # Mock the content for the search page (player search results)
     search_page_content = """
     <tbody class="dataContainer indexSection">
         <tr class="player">
@@ -94,7 +92,6 @@ async def mock_page(mocker):
 @patch("epl_api.v1.helpers.onetrust_accept_cookie")
 async def test_extract_player_stats(cookie, mock_page):
     
-    # Call the extract_player_stats function with the mocked page
     player_stats_generator = await extract_player_stats("Test Player", mock_page)
 
     # Convert the async generator to a list for testing
