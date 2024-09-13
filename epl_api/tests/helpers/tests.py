@@ -79,7 +79,7 @@ async def mock_page(mocker):
     </li>
     """
     # Mock the cookie consent function
-    mocker.patch("epl_api.v1.helpers.onetrust_accept_cookie", new=AsyncMock())
+    # mocker.patch("epl_api.v1.helpers.onetrust_accept_cookie", new=AsyncMock())
 
     # Set the page content mocks for both search and stats pages
     page.content.side_effect = AsyncMock(

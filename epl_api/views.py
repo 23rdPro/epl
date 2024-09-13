@@ -32,8 +32,7 @@ async def get_results(page=Depends(get_page)):
         # Parse page content
         content = await page.content()
         soup = BeautifulSoup(content, "lxml")
-
-        # Extract result data using a generator
+        
         result_elements = soup.select("li.match-fixture")
 
         def extract_result_data(result):
@@ -47,15 +46,13 @@ async def get_results(page=Depends(get_page)):
                 "score": score,
             }
 
-        # Use a generator expression
-        results = (extract_result_data(result) for result in result_elements)
+        results = [extract_result_data(result) for result in result_elements]
 
-        # Use another generator to directly yield the ResultSchema objects
-        return (ResultSchema(**rsch) for rsch in results)
+        return [ResultSchema(**rsch) for rsch in results]
 
 
 @cache_result("epl_table", use_generator=True)
-async def get_table(page=Depends(get_page)):
+async def get_table(page=Depends(get_page)) -> List[TableSchema]:
     await page.goto("https://www.premierleague.com/tables")
     await onetrust_accept_cookie(page)
 
@@ -74,7 +71,6 @@ async def get_table(page=Depends(get_page)):
     table = soup.select_one(
         "#mainContent div.league-table__all-tables-container.allTablesContainer table tbody"
     )
-    rows = table.find_all("tr")
 
     # Function to clean form text
     def clean_form(text):
@@ -112,10 +108,10 @@ async def get_table(page=Depends(get_page)):
             "points": cells[9].text.strip(),
             "form": clean_form(cells[10].text.strip()) if len(cells) > 10 else None,
         }
-
-    league_table = (extract_team_data(row) for row in rows if extract_team_data(row))
-
-    return (TableSchema(**team_data) for team_data in league_table if team_data)
+        
+    rows = table.find_all("tr")
+    league_table = (data for row in rows if (data := extract_team_data(row)))
+    return [TableSchema(**team_data) for team_data in league_table if team_data]
 
 
 @cache_result(
