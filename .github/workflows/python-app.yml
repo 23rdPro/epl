@@ -30,10 +30,6 @@ jobs:
       uses: actions/setup-python@v3
       with:
         python-version: "3.10"
-    - name: Install Playwright
-      run: |
-        pip install playwright
-        playwright install --with-deps 
     - name: Install Redis tools
       run: sudo apt-get update && sudo apt-get install -y redis-tools
     - name: Install dependencies
@@ -44,6 +40,9 @@ jobs:
     - name: Wait for Redis to be ready
       run: |
         until redis-cli -h 127.0.0.1 ping; do echo "Waiting for Redis..."; sleep 1; done
+    - name: Install Playwright
+      run: |
+        playwright install --with-deps 
     - name: Lint with flake8
       run: |
         # stop the build if there are Python syntax errors or undefined names
