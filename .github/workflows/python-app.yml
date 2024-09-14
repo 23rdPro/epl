@@ -33,7 +33,7 @@ jobs:
     - name: Install Playwright
       run: |
         pip install playwright
-        playwright install
+        playwright install --with-deps 
     - name: Install Redis tools
       run: sudo apt-get update && sudo apt-get install -y redis-tools
     - name: Install dependencies
