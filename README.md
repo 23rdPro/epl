@@ -1,85 +1,98 @@
-# epl API
+# EPL API
 
-The epl API is designed to retrieve player statistics, fixtures, tables, and results from the Premier League web app. This API is built using Django for the backend, with FastAPI for high-performance API endpoints, BeautifulSoup for HTML parsing, and Pydantic for data validation and serialization.
+The EPL API provides access to Premier League player statistics, fixtures, standings, and match results. Built with Django, FastAPI, and integrated tools for data parsing and validation, the API offers high performance and simplicity.
 
-## Technologies
+## Core Technologies
 
-- **Django**: A Python web framework for building the API's backend.
-- **BeautifulSoup**: A Python library for parsing HTML and XML documents.
-- **FastAPI**: A modern, high-performance Python web framework for building APIs.
-- **Pydantic**: A data validation and serialization library for Python.
+- **Django**: Manages the API's backend and core functionality.
+- **FastAPI**: Powers the high-performance, asynchronous API endpoints.
+- **BeautifulSoup**: Parses HTML from the Premier League website.
+- **Pydantic**: Validates and serializes data for consistent API responses.
 
-## API Endpoints
+## Endpoints
 
 ### `GET /`
 
-This endpoint retrieves the root information of the API.
+Retrieves general information about the API.
 
 ### `GET /stats/{p_name}`
 
-Retrieves information about a Premier League player with the given name. The player name should be provided as a URL parameter. If filter returns multiple hits, it will return a list instead.
+Fetches statistics for a Premier League player by name. If multiple players match the query, a list of players is returned.
 
-**Returns**:
-
-```json
-{
-  "name": "name", 
-  // todo
-}
-```
-
-### `GET /table`
-
-Retrieves the current Premier League table.
-
-**Returns**:
+#### Example Response Get: player statistics
 
 ```json
 [
   {
-    "position": "Position",
-    "team_name": "Team Name",
-    "played": "Number of Games Played",
-    "won": "Wins",
-    "draw": "Draws",
-    "lost": "Losses",
-    "goal_difference": "Goal Difference",
-    "total_points": "Total Points"
+    "player_name": "Player Name",
+    "appearances": "10",
+    "goals": "5",
+    "wins": "7",
+    "losses": "3",
+    "attack": { /* Attack stats */ },
+    "team_play": { /* Team play stats */ },
+    "discipline": { /* Discipline stats */ },
+    "defence": { /* Defence stats */ }
   }
 ]
 ```
 
-### `GET /fixtures`
+### `GET /table`
 
-Retrieves information about the next three Premier League fixtures.
+Retrieves the current Premier League standings.
 
-**Returns**:
+#### Example Response Get: table
 
-```python
+```json
 [
-  "Team A vs Team B DD/MM/YYYY HH:MM",
-  "Team A vs Team C DD/MM/YYYY HH:MM",
-  "Team A vs Team D DD/MM/YYYY HH:MM"
+  {
+    "position": "1",
+    "club": "Club Name",
+    "played": "5",
+    "won": "4",
+    "drawn": "1",
+    "lost": "0",
+    "gf": "10",
+    "ga": "2",
+    "gd": "8",
+    "points": "13",
+    "form": "WWWDW"
+  }
 ]
 ```
 
 ### `GET /results`
 
-Retrieves Premier League results.
+Fetches recent Premier League match results.
 
-### Setup Instructions
+#### Example Response Get: results
 
-1. Clone the repository.
-2. Open the terminal, navigate to the folder where your clone of this repository is located and type:
-
-```sh
-pip install -r requirements.txt
+```json
+[
+  {
+    "home": "Home Team",
+    "away": "Away Team",
+    "score": "3-1"
+  }
+]
 ```
+
+## Setup Instructions
+
+1. Clone the repository:
+
+   ```sh
+   git clone https://github.com/23rdPro/epl.git
+   ```
+
+2. Install the required dependencies:
+
+   ```sh
+   pip install -r requirements.txt
+   ```
 
 3. Run the application:
 
-```sh
-uvicorn epl_api.asgi:app --reload
-```
-
-The application will run for as long as you let it.
+   ```sh
+   uvicorn epl_api.asgi:app --reload
+   ```

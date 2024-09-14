@@ -188,7 +188,6 @@ def mock_get_page():
 
 @pytest.mark.asyncio
 async def test_get_p_stats_cache_miss(mock_extract_player_stats, mock_get_page):
-    # Arrange
     cache.clear()
     mock_extract_player_stats.return_value = [
         {"player_name": "Player One", "goals": "10", "assists": "5", "attack": {}, "team_play": {}, "discipline": {}, "defence": {}},
@@ -197,9 +196,8 @@ async def test_get_p_stats_cache_miss(mock_extract_player_stats, mock_get_page):
     mock_get_page.return_value = MagicMock()
 
     p_name = "Player One"
-    response = await get_p_stats(p_name)
+    (stat for stat in await get_p_stats(p_name))
 
-    # Act
     result = client.get(f"/api/v1/stats/{p_name}")
 
     # Assert
@@ -212,7 +210,6 @@ async def test_get_p_stats_cache_miss(mock_extract_player_stats, mock_get_page):
 @pytest.mark.asyncio
 async def test_get_p_stats_cache_hit(mock_extract_player_stats, mock_get_page):
     cache.clear()
-    # Arrange
     mock_extract_player_stats.return_value = [
         {"player_name": "Player One", "goals": "10", "assists": "5", "attack": {}, "team_play": {}, "discipline": {}, "defence": {}},
         {"player_name": "Player Two", "goals": "7", "assists": "3", "attack": {}, "team_play": {}, "discipline": {}, "defence": {}},
