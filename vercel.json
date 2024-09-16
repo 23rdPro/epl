@@ -3,6 +3,6 @@
   "builds": [{ "src": "epl_api/asgi.py", "use": "@vercel/python" }],
   "routes": [{ "src": "/api/v1/(.*)", "dest": "epl_api/asgi.py" }],
   "env": {
-    "DJANGO_SETTINGS_MODULE": "epl_api.settings"
+    "DJANGO_SETTINGS_MODULE": "epl/epl_api.settings"
   }
 }
