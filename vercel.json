@@ -1,7 +1,14 @@
 {
   "version": 2,
+  "builds": [
+    {
+      "src": "epl_api/asgi.py",
+      "use": "@vercel/python",
+      "config": { "maxLambdaSize": "50mb" }
+    }
+  ],
   "routes": [{ "src": "/api/v1/(.*)", "dest": "epl_api/asgi.py" }],
   "env": {
-    "DJANGO_SETTINGS_MODULE": "epl_api/settings"
+    "DJANGO_SETTINGS_MODULE": "epl_api.settings"
   }
 }
