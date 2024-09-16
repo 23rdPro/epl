@@ -12,6 +12,7 @@ import os
 from django.core.asgi import get_asgi_application
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from epl_api.urls import router
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "epl_api.settings")
@@ -34,5 +35,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.add_middleware(GZipMiddleware, minimum_size=500)
 
 app.include_router(router, prefix="/api/v1")
