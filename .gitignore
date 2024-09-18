@@ -1,17 +1,33 @@
-epl
-/__pycache__/__init__.cpython-39.pyc
-db.sqlite3
-.env
+# Python Bytecode
+__pycache__/
+*.pyc
 *cpython-*
-*__pycache__*
-.pytest_cache
+
+# Environment Files
+.env
+
+# Database Files
+db.sqlite3
+
+# Test and Cache Files
+.pytest_cache/
+*.pyo
+
+# Venv
+epl/
+
+# IDE and Editor Files
+.DS_Store
+*.swp
+*.swo
 
 # Elastic Beanstalk Files
 .elasticbeanstalk/*
 !.elasticbeanstalk/*.cfg.yml
 !.elasticbeanstalk/*.global.yml
 
+# Vercel Files
+.vercel/
 
-*.pyc
-venv/
-.vercel
+# Other
+*.log
