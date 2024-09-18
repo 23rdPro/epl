@@ -13,6 +13,7 @@ from django.core.asgi import get_asgi_application
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.middleware.wsgi import WSGIMiddleware
 from epl_api.urls import router
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "epl_api.settings")
@@ -27,6 +28,7 @@ app = FastAPI(
     directly from the Premier League website and parses it into JSON.""",
     version="0.0.1",
 )
+# app.mount('/doom', WSGIMiddleware(application))
 
 app.add_middleware(
     CORSMiddleware,
