@@ -1,14 +1,7 @@
 import pytest
+import pytest_asyncio
 from unittest.mock import AsyncMock, patch
-
-import pytest_asyncio
-
 from epl_api.v1.helpers import extract_player_stats
-
-
-from unittest.mock import AsyncMock
-import pytest
-import pytest_asyncio
 
 
 @pytest_asyncio.fixture
