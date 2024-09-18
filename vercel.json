@@ -11,7 +11,7 @@
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "epl_api.asgi.py:app"
+      "dest": "epl_api/asgi.py"
     }
   ]
 }
