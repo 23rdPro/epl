@@ -12,8 +12,5 @@
       "src": "/(.*)",
       "dest": "epl_api/asgi.py"
     }
-  ],
-  "script": {
-    "postinstall": "playwright install --with-deps chromium"
-  }
+  ]
 }
