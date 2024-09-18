@@ -7,6 +7,9 @@
       "config": { "maxLambdaSize": "50mb" }
     }
   ],
+  "scripts": {
+    "build": "pip install -r requirements.txt && playwright install chromium"
+  },
   "routes": [
     {
       "src": "/(.*)",
