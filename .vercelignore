@@ -1,0 +1,14 @@
+# Exclude unnecessary files and directories
+
+*.pyc
+__pycache__/
+.env
+db.sqlite3
+*.log
+*.DS_Store
+*.swp
+*.swo
+*.git
+*.gitignore
+*.pytest_cache/
+.vscode/
