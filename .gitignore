@@ -31,3 +31,4 @@ epl/
 
 # Other
 *.log
+*migrations*

@@ -4,7 +4,7 @@
     {
       "src": "epl_api/asgi.py",
       "use": "@vercel/python",
-      "config": { "maxLambdaSize": "50mb" }
+      "config": { "maxLambdaSize": "50mb", "memory": 512 }
     }
   ],
   "installCommand": "pip install -r requirements.txt && playwright install chromium",
