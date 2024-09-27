@@ -29,9 +29,7 @@ async def extract_player_stats(player: str, page: Page) -> List[Dict]:
     tbody = soup.select_one("tbody.dataContainer.indexSection")
     if not tbody:
         raise Exception("Player table data not found")
-
     players = tbody.find_all("tr", class_="player")
-
     results = [
         {
             "name": player.find("a", class_="player__name").text.strip(),
@@ -43,7 +41,6 @@ async def extract_player_stats(player: str, page: Page) -> List[Dict]:
         }
         for player in players
     ]
-
     return (await extract_p_stats(player, page) for player in results if player)
 
 
@@ -111,9 +108,7 @@ async def extract_p_stats(player_data: dict, page) -> dict:
             "shooting_accuracy": "shooting_accuracy_%",
             "successful_50_50s": "successful_50/50s",
         }
-
         filtered_stats = {}
-
         for field in schema.model_fields:
             if field in stats_dict:
                 filtered_stats[field] = stats_dict[field]
@@ -125,7 +120,6 @@ async def extract_p_stats(player_data: dict, page) -> dict:
                 else:
                     # Default to "N/A" if not found
                     filtered_stats[field] = "N/A"
-
         return schema(**filtered_stats)
 
     # Mapping stats sections
@@ -133,12 +127,10 @@ async def extract_p_stats(player_data: dict, page) -> dict:
     team_play_section = filter_sections("Team Play")
     discipline_section = filter_sections("Discipline")
     defence_section = filter_sections("Defence")
-
     attack: AttackSchema = with_schema(attack_section, AttackSchema)
     team_play: TeamPlaySchema = with_schema(team_play_section, TeamPlaySchema)
     discipline: DisciplineSchema = with_schema(discipline_section, DisciplineSchema)
     defence: DefenceSchema = with_schema(defence_section, DefenceSchema)
-
     return {
         "player_name": player_data["name"],
         "appearances": appearances,

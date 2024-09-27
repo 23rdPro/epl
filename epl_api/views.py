@@ -15,8 +15,32 @@ from playwright.async_api import async_playwright
 from epl_api.v1.utils import cache_result, onetrust_accept_cookie
 
 
-def get_root():
-    return {"message": "Welcome to the EPL API"}
+def get_root(): return {"message": "Welcome to the EPL API"}
+
+
+@cache_result("epl_fixture")
+async def get_fixtures(page=Depends(get_page)):
+    async with async_playwright() as p:
+        await page.goto("https://www.premierleague.com/fixtures")
+        await onetrust_accept_cookie(page)
+        await page.click('li[data-tab-index="0"][data-text="First Team"]')
+        await page.wait_for_selector("li.match-fixture")
+        content = await page.content()
+        soup = BeautifulSoup(content, "lxml")
+        fixture_elements = soup.select("li.match-fixture")
+        
+        def _extract(element):
+            home_team = element.get("data-home", "")
+            away_team = element.get("data-away", "")
+            time = element.select_one("time")
+            return {
+                "home": home_team,
+                "away": away_team,
+                "time": time and time.get("datetime", time.text.strip()),
+            }
+            
+        fixtures = [_extract(e) for e in fixture_elements]
+        return [FixtureSchema(**fsch) for fsch in fixtures]
 
 
 @cache_result("epl_results", use_generator=True)
@@ -26,20 +50,17 @@ async def get_results(page=Depends(get_page)):
         await onetrust_accept_cookie(page)
         await page.wait_for_selector('li[data-tab-index="0"][data-text="First Team"]')
         await page.click('li[data-tab-index="0"][data-text="First Team"]')
-
         await page.wait_for_selector("li.match-fixture")
 
         # Parse page content
         content = await page.content()
         soup = BeautifulSoup(content, "lxml")
-        
         result_elements = soup.select("li.match-fixture")
 
         def extract_result_data(result):
             home_team = result.get("data-home", "")
             away_team = result.get("data-away", "")
             score = result.select_one(".match-fixture__score").text.strip()
-
             return {
                 "home": home_team,
                 "away": away_team,
@@ -47,7 +68,6 @@ async def get_results(page=Depends(get_page)):
             }
 
         results = [extract_result_data(result) for result in result_elements]
-
         return [ResultSchema(**rsch) for rsch in results]
 
 
@@ -108,7 +128,6 @@ async def get_table(page=Depends(get_page)) -> List[TableSchema]:
             "points": cells[9].text.strip(),
             "form": clean_form(cells[10].text.strip()) if len(cells) > 10 else None,
         }
-        
     rows = table.find_all("tr")
     league_table = (data for row in rows if (data := extract_team_data(row)))
     return [TableSchema(**team_data) for team_data in league_table if team_data]
@@ -125,47 +144,4 @@ async def get_p_stats(p_name: str, page=Depends(get_page)):
             {"error get_player_stats": "Failed to retrieve stats"},
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
-    return [PlayerStatsSchema(**p_stat) for p_stat in stats]
-
-
-# @cache_result("epl_fixture")  TODO
-async def get_fixtures():
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        page = await browser.new_page()
-        await page.goto("https://www.premierleague.com")
-
-        # Click on the "Fixtures" link
-        await page.click('a[href="/fixtures"][data-link-index="1"]')
-
-        await page.wait_for_selector('li[data-tab-index="0"][data-text="First Team"]')
-        await page.click('li[data-tab-index="0"][data-text="First Team"]')
-
-        # Wait for the fixtures to load
-        await page.wait_for_selector("li.match-fixture")
-
-        # Parse page content
-        content = await page.content()
-        soup = BeautifulSoup(content, "lxml")
-        await browser.close()
-
-        # Extract fixture data
-        fixtures = []
-        fixture_elements = soup.select("li.match-fixture")
-        for fixture in fixture_elements:
-            home_team = fixture["data-home"]
-            away_team = fixture["data-away"]
-            kickoff_time = fixture["time"]
-
-            # Structure the data using the schemas
-            fixture_data = FixtureSchema(
-                home=home_team,
-                away=away_team,
-                time=kickoff_time,
-            )
-            fixtures.append(fixture_data)
-
-        # Return the structured data
-        return JSONResponse(
-            content={"fixtures": [fixture.model_dump() for fixture in fixtures]}
-        )
+    return [PlayerStatsSchema(**p_stat) async for p_stat in stats]
