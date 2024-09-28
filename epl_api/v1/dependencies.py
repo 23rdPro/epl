@@ -6,7 +6,7 @@ async def get_page():
     browser = None  
     async with async_playwright() as p:
         try:
-            browser = await p.chromium.launch(headless=True, args=["--no-sandbox"])
+            browser = await p.chromium.launch(headless=False, args=["--no-sandbox"])
             page = await browser.new_page()
             try:
                 yield page
