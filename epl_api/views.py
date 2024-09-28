@@ -31,9 +31,7 @@ async def current_club_list(page):
         for i in range(count):
             # Extract link and name for each club
             club_link = (
-                await list_items.nth(i)
-                .locator("a")
-                .get_attribute("href")
+                await list_items.nth(i).locator("a").get_attribute("href")
             ).replace("overview", "results")
             club_name = (
                 await list_items.nth(i).locator("h2.club-card__name").inner_text()
@@ -105,7 +103,7 @@ async def player_level_features(link, page):
         )
 
         players_data[position_header].extend(players)
-    print(">>>>>>>>>>>>>>>>>>>>> start from here")
+    print(">>>>>>>>>>>>>>>>>>>>> start from here")  
     print(players_data)
 
     return players_data
@@ -141,15 +139,12 @@ async def aggregate_club_stats(club: str, page=Depends(get_page)):
     # Fetch team-level and player-level statistics
     team_level = await team_level_features(_link, page)
     player_level = await player_level_features(_link, page)
-    
+
     # print(team_level)
     print(player_level)
 
     # Initialize an aggregated result dictionary
-    aggregate = {
-        "team_stats": [],
-        "player_stats": {}
-    }
+    aggregate = {"team_stats": [], "player_stats": {}}
 
     # Aggregate team-level stats
     for match in team_level:
@@ -158,14 +153,17 @@ async def aggregate_club_stats(club: str, page=Depends(get_page)):
             "away_team": match["away_team"],
             "home_score": match["home_score"],
             "away_score": match["away_score"],
-            "players": []  # Placeholder for players in this match
+            "players": [],  # Placeholder for players in this match
         }
 
         # Extract players from the player_level structure
         for position, players in player_level.items():
             for player in players:
                 # Check if player belongs to the home or away team
-                if player["name"] in match["home_team"] or player["name"] in match["away_team"]:
+                if (
+                    player["name"] in match["home_team"]
+                    or player["name"] in match["away_team"]
+                ):
                     match_info["players"].append(player)
 
         # Append the match info to the team stats
@@ -176,7 +174,6 @@ async def aggregate_club_stats(club: str, page=Depends(get_page)):
         aggregate["player_stats"][position] = players
 
     return aggregate
-
 
 
 @cache_result("epl_fixture")
