@@ -23,7 +23,7 @@ async def current_club_list(page):
     await page.goto("https://www.premierleague.com/clubs")
     await onetrust_accept_cookie(page)
 
-    async def _extract():  # TODO: handle in multi-process
+    async def _extract():  # TODO
         list_items = page.locator("ul.club-list.dataContainer li.club-card-wrapper")
         count = await list_items.count()  # Get the number of list items
 
