@@ -1,4 +1,3 @@
-import asyncio
 import re
 from typing import List
 from bs4 import BeautifulSoup
@@ -24,15 +23,13 @@ async def current_club_list(page):
     await page.goto("https://www.premierleague.com/clubs")
     await onetrust_accept_cookie(page)
 
-    async def _extract():  # TODO: handle background, celery
+    async def _extract():  # TODO: handle in multi-process
         list_items = page.locator("ul.club-list.dataContainer li.club-card-wrapper")
         count = await list_items.count()  # Get the number of list items
 
         for i in range(count):
             # Extract link and name for each club
-            club_link = (
-                await list_items.nth(i).locator("a").get_attribute("href")
-            ).replace("overview", "results")
+            club_link = await list_items.nth(i).locator("a").get_attribute("href")
             club_name = (
                 await list_items.nth(i).locator("h2.club-card__name").inner_text()
             )
@@ -43,137 +40,227 @@ async def current_club_list(page):
 
 
 async def team_level_features(link, page):
-    await page.goto(link)
-    await onetrust_accept_cookie(page)
+    try:
+        await page.goto(link)
+        await onetrust_accept_cookie(page)
 
-    fixtures = await page.locator(
-        "div.fixtures__matches-list ul.matchList li.match-fixture"
-    ).all()
+        fixtures = await page.locator(
+            "div.fixtures__matches-list ul.matchList li.match-fixture"
+        ).all()
 
-    # Aggregate results
-    _agg = [
-        {
-            "home_team": home_team,
-            "away_team": away_team,
-            "home_score": home_score,
-            "away_score": away_score,
-        }
-        for fixture in fixtures
-        for (
-            home_team,
-            away_team,
-            score_text,
-        ) in [
-            await asyncio.gather(
-                fixture.locator("span.match-fixture__team")
-                .first.locator("span.match-fixture__short-name")
-                .inner_text(),
-                fixture.locator("span.match-fixture__team")
-                .nth(1)
-                .locator("span.match-fixture__short-name")
-                .inner_text(),
-                fixture.locator("span.match-fixture__score").inner_text(),
-            )
-        ]
-        if (home_score := int(score_text.split("-")[0])) is not None
-        and (away_score := int(score_text.split("-")[1])) is not None
-    ]
+        for fixture in fixtures:
+            wrapper = fixture.locator("div.match-fixture__wrapper")
+            href = await wrapper.get_attribute("data-href")
+            if href:
+                link_ = f"https:{href}"
+                yield link_
 
-    return _agg
+                await page.goto(link_)
+                await onetrust_accept_cookie(page)
+
+                try:
+                    # Get all the tab elements
+                    tabs = await page.locator('li[role="tab"]').all()
+
+                    # Check and click the "Line-ups"
+                    for tab in tabs:
+                        if (
+                            tab_text := await tab.inner_text()
+                        ) and "Line-ups" in tab_text:
+                            await tab.click()
+                            break
+                    else:
+                        print("Line-ups tab not found")
+                except Exception as e:
+                    print(e, ">>> Error")
+                await page.wait_for_selector(".matchLineups")
+
+                match_details = {"lineups": {}}
+                home_team_locator = page.locator(
+                    ".teamList.mcLineUpContainter.homeLineup.active"
+                )
+                home_team = await home_team_locator.all_text_contents()
+
+                away_team_locator = page.locator(
+                    ".teamList.mcLineUpContainter.awayLineup"
+                )
+                away_team = await away_team_locator.all_text_contents()
+
+                def _clean(text: str) -> str:
+                    return (
+                        text[0]
+                        .strip()
+                        .replace("\n", " ")
+                        .replace("  ", " ")
+                        .split(" Shirt number ")
+                    )
+
+                cleaned_home = _clean(home_team)
+                cleaned_away = _clean(away_team)
+
+                for team_info, team_name in zip(
+                    [cleaned_home, cleaned_away], ["Home", "Away"]
+                ):
+                    if not team_info:
+                        continue
+
+                    subi = next(
+                        i for i, entry in enumerate(team_info) if "Substitutes" in entry
+                    )
+                    starters = team_info[:subi]
+                    substitutes = team_info[subi + 1 :]
+
+                    # Extract formation and team name from the first entry
+                    first_entry_parts = starters[0].split()
+                    formation = first_entry_parts[-2]
+                    match_details["lineups"][team_name] = {
+                        "formation": formation,
+                        "starters": {},
+                        "substitutes": {},
+                    }
+
+                    def _extract_player_info(player_string):
+                        player_info = {}
+                        parts = player_string.split()
+
+                        # Extracting shirt number and name
+                        player_info["name"] = " ".join(
+                            parts[1:3]
+                        )  # First and last name
+
+                        # Default card and goal values
+                        player_info["yellow_cards"] = 1 if "Yellow" in parts else 0
+                        player_info["red_cards"] = 1 if "Red" in parts else 0
+
+                        # Count occurrences of "Goal" to determine total goals
+                        player_info["goals"] = player_string.count("Goal")
+                        player_info["goals"] += player_string.count(
+                            "label.penaltyscore"
+                        )
+
+                        # Minutes played (if any)
+                        minutes_played = [part for part in parts if "'" in part]
+                        player_info["minutes"] = (
+                            minutes_played[0].strip("'") if minutes_played else "90"
+                        )
+
+                        return player_info
+
+                    # Process starters
+                    for entry in starters[1:]:  # Skip the first entry (team info)
+                        player_info = _extract_player_info(entry)
+                        name = player_info["name"]
+
+                        if name not in match_details["lineups"][team_name]["starters"]:
+                            match_details["lineups"][team_name]["starters"][name] = {
+                                "goals": player_info["goals"],
+                                "yellow_cards": player_info["yellow_cards"],
+                                "red_cards": player_info["red_cards"],
+                                "minutes": player_info["minutes"],
+                            }
+                        else:
+                            # Accumulate stats for players appearing multiple times
+                            existing_player = match_details["lineups"][team_name][
+                                "starters"
+                            ][name]
+                            existing_player["goals"] += player_info["goals"]
+                            existing_player["yellow_cards"] += player_info[
+                                "yellow_cards"
+                            ]
+                            existing_player["red_cards"] += player_info["red_cards"]
+
+                    # Process substitutes
+                    for entry in substitutes:
+                        player_info = _extract_player_info(entry)
+                        name = player_info["name"]
+                        match_details["lineups"][team_name]["substitutes"][name] = {
+                            "goals": player_info["goals"],
+                            "yellow_cards": player_info["yellow_cards"],
+                            "red_cards": player_info["red_cards"],
+                            "minutes": player_info["minutes"],
+                        }
+
+                yield match_details
+    except Exception as e:
+        print(e, ">>> Error")
 
 
 async def player_level_features(link, page):
     await page.goto(link)
     await onetrust_accept_cookie(page)
 
-    squad_list = await page.locator("ul.squadListContainer.squad-list").all()
+    squads = await page.locator("ul.squadListContainer.squad-list").all_text_contents()
 
-    players_data = {}
+    # Clean the squad list content by replacing newline characters and extra spaces
+    cleaned_squads = [re.sub(r"\s+", " ", s.replace("\n", " ")).strip() for s in squads]
 
-    for squad in squad_list:
-        # Get the position header
-        position_header = await squad.locator("h1").inner_text()
-        players_data[position_header] = []
-
-        player_cards = await squad.locator("ul li.stats-card").all()
-
-        # Extract player details concurrently
-        players = await asyncio.gather(
-            *[_extract_player_stats(player_card) for player_card in player_cards]
+    def extract_player_data(from_text):
+        # Split the text into sections by positions
+        player_data = {}
+        players_by_position = re.split(
+            r"(Goalkeepers|Defenders|Midfielders|Forwards)", from_text[0]
         )
 
-        players_data[position_header].extend(players)
-    print(">>>>>>>>>>>>>>>>>>>>> start from here")  
-    print(players_data)
+        # Iterate over positions and associated player details
+        for i in range(1, len(players_by_position), 2):
+            position = players_by_position[i].strip()
+            players_section = players_by_position[i + 1].strip()
 
-    return players_data
+            # Split players based on "View Profile" which marks the end of player data
+            player_entries = players_section.split("View Profile")
 
+            # List to hold player data for the current position
+            player_data[position] = []
 
-async def _extract_player_stats(player_card):
-    player_name = await player_card.locator("div.stats-card__name").inner_text()
+            for entry in player_entries:
+                entry = entry.strip()
+                if not entry:
+                    continue  # Skip empty entries
 
-    # Extract player statistics
-    stats = {
-        await stat.locator("div.stats-card__pos")
-        .inner_text(): await stat.locator("div.stats-card__stat")
-        .inner_text()
-        for stat in await player_card.locator(
-            "ul.stats-card__stats-list.js-featured-player-stats li.stats-card__row"
-        ).all()
-    }
+                player_info = {}
 
-    # Return player data as a dictionary
-    return {"name": player_name, **stats}
+                # Extract player name before "Appearances"
+                name_pos = entry.find("Appearances")
+                if name_pos != -1:
+                    player_info["name"] = entry[:name_pos].rsplit(" ", 1)[0].strip()
+                else:
+                    player_info["name"] = "Unknown"
+
+                def extract_stat(pattern, text, default=0):
+                    match = re.search(pattern, text)
+                    return int(match.group(1)) if match else default
+
+                # Extract numeric stats (default to 0 if not found)
+                player_info["appearances"] = extract_stat(r"Appearances (\d+)", entry)
+                player_info["goals"] = extract_stat(r"Goals (\d+)", entry)
+                player_info["assists"] = extract_stat(r"Assists (\d+)", entry)
+                player_info["clean_sheets"] = extract_stat(r"Clean sheets (\d+)", entry)
+                player_info["saves"] = extract_stat(r"Saves (\d+)", entry)
+                player_info["shots"] = extract_stat(r"Shots (\d+)", entry)
+
+                # Append player info to the list for this position
+                player_data[position].append(player_info)
+
+        return player_data
+
+    return extract_player_data(cleaned_squads)
 
 
 # @cache_result(lambda club: '-'.join(club.split()))
 async def aggregate_club_stats(club: str, page=Depends(get_page)):
     _links = await current_club_list(page)
-    _link = None
+    p_link = t_link = None
 
     async for name, link in _links:
         if club.lower() in name.lower():
-            _link = link
+            p_link = link.replace("overview", "squad?se=719")
+            t_link = link.replace("overview", "results")
             break
 
     # Fetch team-level and player-level statistics
-    team_level = await team_level_features(_link, page)
-    player_level = await player_level_features(_link, page)
-
-    # print(team_level)
-    print(player_level)
-
-    # Initialize an aggregated result dictionary
-    aggregate = {"team_stats": [], "player_stats": {}}
-
-    # Aggregate team-level stats
-    for match in team_level:
-        match_info = {
-            "home_team": match["home_team"],
-            "away_team": match["away_team"],
-            "home_score": match["home_score"],
-            "away_score": match["away_score"],
-            "players": [],  # Placeholder for players in this match
-        }
-
-        # Extract players from the player_level structure
-        for position, players in player_level.items():
-            for player in players:
-                # Check if player belongs to the home or away team
-                if (
-                    player["name"] in match["home_team"]
-                    or player["name"] in match["away_team"]
-                ):
-                    match_info["players"].append(player)
-
-        # Append the match info to the team stats
-        aggregate["team_stats"].append(match_info)
-
-    # Aggregate player stats by position
-    for position, players in player_level.items():
-        aggregate["player_stats"][position] = players
-
-    return aggregate
+    teamattr = [tfeat async for tfeat in team_level_features(t_link, page)]
+    player_level = await player_level_features(p_link, page)
+    return {"team_stats": teamattr, "player_stats": player_level}
 
 
 @cache_result("epl_fixture")
