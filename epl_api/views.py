@@ -1,3 +1,4 @@
+import asyncio
 import re
 from typing import List
 from bs4 import BeautifulSoup
@@ -12,7 +13,7 @@ from epl_api.v1.schemas import (
 from fastapi import Depends, status
 from fastapi.responses import JSONResponse
 from playwright.async_api import async_playwright
-from epl_api.v1.utils import cache_result, onetrust_accept_cookie
+from epl_api.v1.utils import cache_result, get_browser, onetrust_accept_cookie
 
 
 def get_root():
@@ -40,149 +41,163 @@ async def current_club_list(page):
 
 
 async def team_level_features(link, page):
-    try:
-        await page.goto(link)
+    await page.goto(link)
+    await onetrust_accept_cookie(page)
+
+    fixtures = await page.locator(
+        "div.fixtures__matches-list ul.matchList li.match-fixture"
+    ).all()
+
+    # coroutine tasks for parallel processing
+    tasks = []
+
+    for fixture in fixtures:
+        tmp = {}
+        wrapper = fixture.locator("div.match-fixture__wrapper")
+        href = await wrapper.get_attribute("data-href")
+        home_team_name = await fixture.locator(
+            "span.match-fixture__team:nth-child(1) span.match-fixture__short-name"
+        ).inner_text()
+        away_team_name = await fixture.locator(
+            "span.match-fixture__team:nth-child(3) span.match-fixture__short-name"
+        ).inner_text()
+        score_element = await fixture.locator("span.match-fixture__score").inner_text()
+        score = score_element.strip() if score_element else None
+
+        tmp["home_team_name"] = home_team_name
+        tmp["away_team_name"] = away_team_name
+        tmp["score"] = score.replace("\n", "").strip()
+        tmp["href"] = f"https:{href}"
+
+        # Add the task for processing;
+        tasks.append(process_fixture(tmp))
+
+    # Run concurrently
+    results = await asyncio.gather(*tasks)
+
+    for result in results:
+        yield result
+
+
+async def process_fixture(fixture):
+    async for browser in get_browser():
+        page = await browser.new_page()
+
+        try:
+            response = await page.goto(fixture["href"])
+            assert response.status == 200
+        except Exception as e:
+            print("Error href >> ", e)
         await onetrust_accept_cookie(page)
 
-        fixtures = await page.locator(
-            "div.fixtures__matches-list ul.matchList li.match-fixture"
-        ).all()
+        # try:  TODO Buggy
+        #     # Click on the "Line-ups" tab if available
+        #     tab_locator = page.locator('li[role="tab"]:has-text("Line-ups")')
+        #     if await tab_locator.count() > 0:
+        #         await tab_locator.click()
+        #     else:
+        #         print("Line-ups tab not found")
+        #         return None
+        # except Exception as e:
+        #     print(e, ">>> Error Line-ups")
+        #     return None
 
-        for fixture in fixtures:
-            wrapper = fixture.locator("div.match-fixture__wrapper")
-            href = await wrapper.get_attribute("data-href")
-            if href:
-                link_ = f"https:{href}"
-                yield link_
+        try:
+            # Get all the tab elements
+            tabs = await page.locator('li[role="tab"]').all()
 
-                await page.goto(link_)
-                await onetrust_accept_cookie(page)
+            # Check and click the "Line-ups"
+            for tab in tabs:
+                if (tab_text := await tab.inner_text()) and "Line-ups" in tab_text:
+                    await tab.click()
+                    break
+            else:
+                print("Line-ups tab not found")
+        except Exception as e:
+            print(e, ">>> Error Line-ups")
 
-                try:
-                    # Get all the tab elements
-                    tabs = await page.locator('li[role="tab"]').all()
+        await page.wait_for_selector(".matchLineups")
 
-                    # Check and click the "Line-ups"
-                    for tab in tabs:
-                        if (
-                            tab_text := await tab.inner_text()
-                        ) and "Line-ups" in tab_text:
-                            await tab.click()
-                            break
-                    else:
-                        print("Line-ups tab not found")
-                except Exception as e:
-                    print(e, ">>> Error")
-                await page.wait_for_selector(".matchLineups")
+        # Extract home and away team lineup data
+        match_details = {"lineups": {}}
+        home_team_locator = page.locator(
+            ".teamList.mcLineUpContainter.homeLineup.active"
+        )
+        away_team_locator = page.locator(".teamList.mcLineUpContainter.awayLineup")
 
-                match_details = {"lineups": {}}
-                home_team_locator = page.locator(
-                    ".teamList.mcLineUpContainter.homeLineup.active"
-                )
-                home_team = await home_team_locator.all_text_contents()
+        home_team = await home_team_locator.all_text_contents()
+        away_team = await away_team_locator.all_text_contents()
 
-                away_team_locator = page.locator(
-                    ".teamList.mcLineUpContainter.awayLineup"
-                )
-                away_team = await away_team_locator.all_text_contents()
+        match_details["lineups"] = process_lineups(home_team, away_team, fixture)
 
-                def _clean(text: str) -> str:
-                    return (
-                        text[0]
-                        .strip()
-                        .replace("\n", " ")
-                        .replace("  ", " ")
-                        .split(" Shirt number ")
-                    )
+        return match_details
 
-                cleaned_home = _clean(home_team)
-                cleaned_away = _clean(away_team)
 
-                for team_info, team_name in zip(
-                    [cleaned_home, cleaned_away], ["Home", "Away"]
-                ):
-                    if not team_info:
-                        continue
+def process_lineups(home_team, away_team, fixture):
+    def _clean(team_text):
+        return (
+            team_text[0]
+            .strip()
+            .replace("\n", " ")
+            .replace("  ", " ")
+            .split(" Shirt number ")
+        )
 
-                    subi = next(
-                        i for i, entry in enumerate(team_info) if "Substitutes" in entry
-                    )
-                    starters = team_info[:subi]
-                    substitutes = team_info[subi + 1 :]
+    cleaned_home = _clean(home_team)
+    cleaned_away = _clean(away_team)
+    lineups = {}
 
-                    # Extract formation and team name from the first entry
-                    first_entry_parts = starters[0].split()
-                    formation = first_entry_parts[-2]
-                    match_details["lineups"][team_name] = {
-                        "formation": formation,
-                        "starters": {},
-                        "substitutes": {},
-                    }
+    for team_info, team_name in zip(
+        [cleaned_home, cleaned_away],
+        [fixture["home_team_name"], fixture["away_team_name"]],
+    ):
+        if not team_info:
+            continue
 
-                    def _extract_player_info(player_string):
-                        player_info = {}
-                        parts = player_string.split()
+        subi = next(
+            (i for i, entry in enumerate(team_info) if "Substitutes" in entry), None
+        )
+        starters = team_info[:subi] if subi else team_info
+        substitutes = team_info[subi + 1 :] if subi else []
 
-                        # Extracting shirt number and name
-                        player_info["name"] = " ".join(
-                            parts[1:3]
-                        )  # First and last name
+        formation = starters[0].split()[-2] if starters else None
+        lineups[team_name] = {
+            "formation": formation,
+            "score": fixture["score"],
+            "starters": process_players(
+                starters[1:], "90"
+            ),  # Skip first entry (team info)
+            "substitutes": process_players(substitutes, "0"),
+        }
 
-                        # Default card and goal values
-                        player_info["yellow_cards"] = 1 if "Yellow" in parts else 0
-                        player_info["red_cards"] = 1 if "Red" in parts else 0
+    return lineups
 
-                        # Count occurrences of "Goal" to determine total goals
-                        player_info["goals"] = player_string.count("Goal")
-                        player_info["goals"] += player_string.count(
-                            "label.penaltyscore"
-                        )
 
-                        # Minutes played (if any)
-                        minutes_played = [part for part in parts if "'" in part]
-                        player_info["minutes"] = (
-                            minutes_played[0].strip("'") if minutes_played else "90"
-                        )
+def process_players(players, custom):
+    def _extract_player_info(player_string):
+        player_info = {}
+        parts = player_string.split()
+        player_info["name"] = " ".join(parts[1:3])  # First and last name
 
-                        return player_info
+        player_info["yellow_cards"] = 1 if "Yellow" in parts else 0
+        player_info["red_cards"] = 1 if "Red" in parts else 0
+        player_info["goals"] = player_string.count("Goal") + player_string.count(
+            "label.penaltyscore"
+        )
 
-                    # Process starters
-                    for entry in starters[1:]:  # Skip the first entry (team info)
-                        player_info = _extract_player_info(entry)
-                        name = player_info["name"]
+        minutes_played = [
+            part for part in parts if "'" in part and part.replace("'", "").isdigit()
+        ]
+        player_info["minutes"] = (
+            minutes_played[0].strip("'") if minutes_played else custom
+        )
 
-                        if name not in match_details["lineups"][team_name]["starters"]:
-                            match_details["lineups"][team_name]["starters"][name] = {
-                                "goals": player_info["goals"],
-                                "yellow_cards": player_info["yellow_cards"],
-                                "red_cards": player_info["red_cards"],
-                                "minutes": player_info["minutes"],
-                            }
-                        else:
-                            # Accumulate stats for players appearing multiple times
-                            existing_player = match_details["lineups"][team_name][
-                                "starters"
-                            ][name]
-                            existing_player["goals"] += player_info["goals"]
-                            existing_player["yellow_cards"] += player_info[
-                                "yellow_cards"
-                            ]
-                            existing_player["red_cards"] += player_info["red_cards"]
+        return player_info
 
-                    # Process substitutes
-                    for entry in substitutes:
-                        player_info = _extract_player_info(entry)
-                        name = player_info["name"]
-                        match_details["lineups"][team_name]["substitutes"][name] = {
-                            "goals": player_info["goals"],
-                            "yellow_cards": player_info["yellow_cards"],
-                            "red_cards": player_info["red_cards"],
-                            "minutes": player_info["minutes"],
-                        }
-
-                yield match_details
-    except Exception as e:
-        print(e, ">>> Error")
+    return {
+        player_info["name"]: player_info
+        for player_info in map(_extract_player_info, players)
+    }
 
 
 async def player_level_features(link, page):

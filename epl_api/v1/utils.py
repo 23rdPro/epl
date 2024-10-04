@@ -3,6 +3,14 @@ from functools import wraps
 from typing import Any, Callable, Union
 from django.core.cache import cache
 from django.conf import settings
+from playwright.async_api import async_playwright
+
+
+async def get_browser():
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True, args=["--no-sandbox"])
+        yield browser
+        await browser.close()
 
 
 async def onetrust_accept_cookie(page):

@@ -11,7 +11,7 @@ async def get_page():
             try:
                 yield page
             finally:
-                if browser:  
+                if browser:
                     await browser.close()
         except Exception as e:
             logging.error(f"Failed to launch Playwright: {e}")
