@@ -157,7 +157,7 @@ def process_lineups(home_team, away_team, fixture):
         subi = next(
             (i for i, entry in enumerate(team_info) if "Substitutes" in entry), None
         )
-        starters = team_info[:subi] if subi else team_info
+        starters = team_info[:subi+1] if subi else team_info
         substitutes = team_info[subi + 1 :] if subi else []
 
         formation = starters[0].split()[-2] if starters else None
