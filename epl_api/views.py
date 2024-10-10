@@ -94,7 +94,6 @@ async def process_fixture(fixture, home, away):
         try:
             # Click on the "Line-ups" tab if available
             lineup_locator = page.locator('li[role="tab"]:has-text("Line-ups")')
-            # matchstat_locator = page.locator('li[role="tab"]:has-text("Stats")')
             if await lineup_locator.count() > 0:
                 await lineup_locator.click()
             else:
@@ -157,6 +156,47 @@ async def process_fixture(fixture, home, away):
 
         match_details["assists"] = assists
         match_details["lineups"] = process_lineups(home_team, away_team, fixture)
+
+        # Click on the "Stats" tab to scrape match statistics
+        try:
+            # Combine both data-tab-index and filter by the exact text "Stats"
+            matchstat_locator = page.locator(
+                'li[role="tab"][data-tab-index="2"]'
+            ).filter(has_text="Stats")
+
+            await matchstat_locator.click()
+        except Exception as e:
+            print(e, ">>> Error matchstat_locator")
+            return match_details
+
+        await page.wait_for_selector(".matchCentreStatsContainer")
+
+        # Extract match statistics
+        match_stats = {home: {}, away: {}}
+        stats_locator = page.locator(".matchCentreStatsContainer").nth(0)
+
+        statistics = await stats_locator.all_text_contents()
+
+        async def _extract_statistics(stats_text):
+            pattern = r"([\d.]+)\s+([A-Za-z\s%]+)\s+([\d.]+)"
+            matches = re.findall(pattern, stats_text)
+
+            match_stats = {home: {}, away: {}}
+
+            for match in matches:
+                home_value, stat_name, away_value = match
+                home_value = float(home_value) if "." in home_value else int(home_value)
+                away_value = float(away_value) if "." in away_value else int(away_value)
+
+                match_stats[home][stat_name.strip()] = home_value
+                match_stats[away][stat_name.strip()] = away_value
+
+            return match_stats
+
+        awaited_statistics = await _extract_statistics(statistics[0])
+
+        # # Add match statistics to match details
+        match_details["match_stats"] = awaited_statistics
         return match_details
 
 
