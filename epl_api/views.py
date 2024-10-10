@@ -70,7 +70,7 @@ async def team_level_features(link, page):
         tmp["href"] = f"https:{href}"
 
         # Add the task for processing;
-        tasks.append(process_fixture(tmp))
+        tasks.append(process_fixture(tmp, home_team_name, away_team_name))
 
     # Run concurrently
     results = await asyncio.gather(*tasks)
@@ -79,7 +79,8 @@ async def team_level_features(link, page):
         yield result
 
 
-async def process_fixture(fixture):
+async def process_fixture(fixture, home, away):
+    _clean = lambda text: text.strip().replace("\n", " ").strip()
     async for browser in get_browser():
         page = await browser.new_page()
 
@@ -90,32 +91,18 @@ async def process_fixture(fixture):
             print("Error href >> ", e)
         await onetrust_accept_cookie(page)
 
-        # try:  TODO Buggy
-        #     # Click on the "Line-ups" tab if available
-        #     tab_locator = page.locator('li[role="tab"]:has-text("Line-ups")')
-        #     if await tab_locator.count() > 0:
-        #         await tab_locator.click()
-        #     else:
-        #         print("Line-ups tab not found")
-        #         return None
-        # except Exception as e:
-        #     print(e, ">>> Error Line-ups")
-        #     return None
-
         try:
-            # Get all the tab elements
-            tabs = await page.locator('li[role="tab"]').all()
-
-            # Check and click the "Line-ups"
-            for tab in tabs:
-                if (tab_text := await tab.inner_text()) and "Line-ups" in tab_text:
-                    await tab.click()
-                    break
+            # Click on the "Line-ups" tab if available
+            lineup_locator = page.locator('li[role="tab"]:has-text("Line-ups")')
+            # matchstat_locator = page.locator('li[role="tab"]:has-text("Stats")')
+            if await lineup_locator.count() > 0:
+                await lineup_locator.click()
             else:
                 print("Line-ups tab not found")
+                return None
         except Exception as e:
             print(e, ">>> Error Line-ups")
-
+            return None
         await page.wait_for_selector(".matchLineups")
 
         # Extract home and away team lineup data
@@ -128,8 +115,48 @@ async def process_fixture(fixture):
         home_team = await home_team_locator.all_text_contents()
         away_team = await away_team_locator.all_text_contents()
 
-        match_details["lineups"] = process_lineups(home_team, away_team, fixture)
+        home_assists = (
+            await page.locator(".mc-summary__player-names-container")
+            .nth(0)
+            .locator(".mc-summary__assister")
+            .all_text_contents()
+        )
+        home_assists = [
+            re.split(r"’| \(|\)", item) for item in map(_clean, home_assists) if item
+        ]
+        away_assists = (
+            await page.locator(".mc-summary__player-names-container")
+            .nth(1)
+            .locator(".mc-summary__assister")
+            .all_text_contents()
+        )
+        away_assists = [
+            re.split(r"’| \(|\)", item) for item in map(_clean, away_assists) if item
+        ]
 
+        assists = {home: [], away: []}
+
+        def _extract_assists(given, which: str):
+            for item in given:
+                minute, name = (
+                    (item[0], item[1])
+                    if item[0].isdigit() or "+" in item[0]
+                    else (item[2], item[0])
+                )
+
+                # Sum minutes if there are additional time (e.g. "45+2")
+                assists[which].append(
+                    {
+                        "name": name.strip(),
+                        "minute": sum(map(int, minute.strip().split("+"))),
+                    }
+                )
+
+        _extract_assists(home_assists, home)
+        _extract_assists(away_assists, away)
+
+        match_details["assists"] = assists
+        match_details["lineups"] = process_lineups(home_team, away_team, fixture)
         return match_details
 
 
@@ -157,7 +184,7 @@ def process_lineups(home_team, away_team, fixture):
         subi = next(
             (i for i, entry in enumerate(team_info) if "Substitutes" in entry), None
         )
-        starters = team_info[:subi+1] if subi else team_info
+        starters = team_info[: subi + 1] if subi else team_info
         substitutes = team_info[subi + 1 :] if subi else []
 
         formation = starters[0].split()[-2] if starters else None
