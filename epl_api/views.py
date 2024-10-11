@@ -85,12 +85,10 @@ async def process_fixture(fixture, home, away):
         page = await browser.new_page()
 
         try:
-            response = await page.goto(fixture["href"])
-            assert response.status == 200
+            await page.goto(fixture["href"])
         except Exception as e:
             print("Error href >> ", e)
         await onetrust_accept_cookie(page)
-
         try:
             # Click on the "Line-ups" tab if available
             lineup_locator = page.locator('li[role="tab"]:has-text("Line-ups")')
@@ -114,45 +112,43 @@ async def process_fixture(fixture, home, away):
         home_team = await home_team_locator.all_text_contents()
         away_team = await away_team_locator.all_text_contents()
 
-        home_assists = (
-            await page.locator(".mc-summary__player-names-container")
-            .nth(0)
-            .locator(".mc-summary__assister")
-            .all_text_contents()
+        home_assists_events = page.locator(
+            ".matchEventsContainer.home .mc-summary__event"
         )
-        home_assists = [
-            re.split(r"’| \(|\)", item) for item in map(_clean, home_assists) if item
-        ]
-        away_assists = (
-            await page.locator(".mc-summary__player-names-container")
-            .nth(1)
-            .locator(".mc-summary__assister")
-            .all_text_contents()
+        away_assists_events = page.locator(
+            ".matchEventsContainer.away .mc-summary__event"
         )
-        away_assists = [
-            re.split(r"’| \(|\)", item) for item in map(_clean, away_assists) if item
-        ]
+
+        async def _extract_assists(events, which_team):
+            for i in range(await events.count()):
+                event = events.nth(i)
+                player_container = event.locator(".mc-summary__player-names-container")
+
+                # Get all assist elements within this event
+                assist_elements = await player_container.locator(
+                    ".mc-summary__assister"
+                ).all_text_contents()
+
+                for assist in assist_elements:
+                    assist_cleaned = re.split(r"’| \(|\)", _clean(assist))
+                    if len(assist_cleaned) >= 2:
+                        minute, name = (
+                            (assist_cleaned[0], assist_cleaned[1])
+                            if assist_cleaned[0].isdigit() or "+" in assist_cleaned[0]
+                            else (assist_cleaned[2], assist_cleaned[0])
+                        )
+
+                        # Sum minutes if there are additional time (e.g. "45+2")
+                        assists[which_team].append(
+                            {
+                                "name": name.strip(),
+                                "minute": sum(map(int, minute.strip().split("+"))),
+                            }
+                        )
 
         assists = {home: [], away: []}
-
-        def _extract_assists(given, which: str):
-            for item in given:
-                minute, name = (
-                    (item[0], item[1])
-                    if item[0].isdigit() or "+" in item[0]
-                    else (item[2], item[0])
-                )
-
-                # Sum minutes if there are additional time (e.g. "45+2")
-                assists[which].append(
-                    {
-                        "name": name.strip(),
-                        "minute": sum(map(int, minute.strip().split("+"))),
-                    }
-                )
-
-        _extract_assists(home_assists, home)
-        _extract_assists(away_assists, away)
+        await _extract_assists(home_assists_events, home)
+        await _extract_assists(away_assists_events, away)
 
         match_details["assists"] = assists
         match_details["lineups"] = process_lineups(home_team, away_team, fixture)
@@ -172,7 +168,6 @@ async def process_fixture(fixture, home, away):
         await page.wait_for_selector(".matchCentreStatsContainer")
 
         # Extract match statistics
-        match_stats = {home: {}, away: {}}
         stats_locator = page.locator(".matchCentreStatsContainer").nth(0)
 
         statistics = await stats_locator.all_text_contents()
